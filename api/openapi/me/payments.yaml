@@ -1,0 +1,66 @@
+# 契約者の支払方法（payments.md §7.2・§7.3）。主体は consumer。カード番号は受け付けない（トークンだけ。NFR-007）。
+# DELETE /v1/me/payment-methods/{id} は Orchestration の担当（使用中かを確かめてから payments の DeletePaymentMethod を呼ぶ）。
+openapi: 3.0.3
+info: {title: me-payments, version: "1"}
+paths:
+  /v1/me/payment-methods:
+    post:
+      operationId: meRegisterPaymentMethod
+      x-sp-isolation: not_applicable:registers a method for the caller only
+      x-sp-idempotency: required
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [method_type, provider, token]
+              properties:
+                method_type: {type: string, enum: [card]}
+                provider: {type: string, maxLength: 32}
+                token: {type: string, maxLength: 256}
+      responses:
+        "201": {description: 登録した支払方法, content: {application/json: {schema: {$ref: '#/components/schemas/PaymentMethod'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+        "422": {$ref: '../common.yaml#/components/responses/Problem'}
+        "503": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: meListPaymentMethods
+      x-sp-isolation: not_applicable:lists only the caller's own methods (customer RLS)
+      parameters:
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 有効な支払方法（作成の新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/PaymentMethod'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    PaymentMethod:
+      type: object
+      required: [id, method_type, status, display, expired, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        method_type: {type: string, enum: [card]}
+        status: {type: string, enum: [active, deleted]}
+        display:
+          type: object
+          required: [brand, last4, exp_month, exp_year]
+          properties:
+            brand: {type: string}
+            last4: {type: string}
+            exp_month: {type: integer}
+            exp_year: {type: integer}
+        expired: {type: boolean}
+        created_at: {type: string, format: date-time}

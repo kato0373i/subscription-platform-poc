@@ -80,25 +80,27 @@ type CustomerAccountID = ID[CustomerAccountTag]
 
 // 以下はモジュールをまたいで渡す ID（他モジュールの contracts を import せずに型を合わせるため。P-IMP-12・14）。
 type (
-	SubscriptionTag  struct{}
-	ProductTag       struct{}
-	PlanTag          struct{}
-	PriceVersionTag  struct{}
-	CouponTag        struct{}
-	RedemptionTag    struct{}
-	InvoiceTag       struct{}
-	PaymentMethodTag struct{}
+	SubscriptionTag   struct{}
+	ProductTag        struct{}
+	PlanTag           struct{}
+	PriceVersionTag   struct{}
+	CouponTag         struct{}
+	RedemptionTag     struct{}
+	InvoiceTag        struct{}
+	PaymentMethodTag  struct{}
+	PaymentAttemptTag struct{}
 )
 
 type (
-	SubscriptionID  = ID[SubscriptionTag]
-	ProductID       = ID[ProductTag]
-	PlanID          = ID[PlanTag]
-	PriceVersionID  = ID[PriceVersionTag]
-	CouponID        = ID[CouponTag]
-	RedemptionID    = ID[RedemptionTag]
-	InvoiceID       = ID[InvoiceTag]
-	PaymentMethodID = ID[PaymentMethodTag]
+	SubscriptionID   = ID[SubscriptionTag]
+	ProductID        = ID[ProductTag]
+	PlanID           = ID[PlanTag]
+	PriceVersionID   = ID[PriceVersionTag]
+	CouponID         = ID[CouponTag]
+	RedemptionID     = ID[RedemptionTag]
+	InvoiceID        = ID[InvoiceTag]
+	PaymentMethodID  = ID[PaymentMethodTag]
+	PaymentAttemptID = ID[PaymentAttemptTag]
 )
 
 type EventTag struct{}

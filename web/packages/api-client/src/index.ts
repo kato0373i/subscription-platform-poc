@@ -8,6 +8,8 @@ export type { paths as CheckoutCatalogPaths, components as CheckoutCatalogCompon
 export type { paths as MeSubscriptionPaths, components as MeSubscriptionComponents } from "./gen/me-subscription.ts";
 export type { paths as ConsoleSubscriptionPaths, components as ConsoleSubscriptionComponents } from "./gen/console-subscription.ts";
 export type { paths as TenantSubscriptionPaths, components as TenantSubscriptionComponents } from "./gen/tenant-subscription.ts";
+export type { paths as MePaymentsPaths, components as MePaymentsComponents } from "./gen/me-payments.ts";
+export type { paths as OpsPaymentsPaths, components as OpsPaymentsComponents } from "./gen/ops-payments.ts";
 export type { ErrorCode } from "./error-codes.ts";
 export { errorStatus } from "./error-codes.ts";
 

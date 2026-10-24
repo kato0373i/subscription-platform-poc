@@ -1,0 +1,25 @@
+# 申込ページがトークナイザーを選ぶための設定（payments.md §7.1）。認証なし。
+openapi: 3.0.3
+info: {title: checkout-payments, version: "1"}
+paths:
+  /v1/checkout/payment-config:
+    get:
+      operationId: checkoutPaymentConfig
+      responses:
+        "200":
+          description: 有効な決済手段
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [methods]
+                properties:
+                  methods:
+                    type: array
+                    items:
+                      type: object
+                      required: [method_type, provider, public_key]
+                      properties:
+                        method_type: {type: string}
+                        provider: {type: string}
+                        public_key: {type: string, nullable: true}

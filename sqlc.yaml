@@ -47,3 +47,12 @@ sql:
         out: modules/subscription/internal/adapter/postgres/sqlcgen
         sql_package: pgx/v5
         emit_pointers_for_null_types: true
+  - engine: postgresql
+    schema: [internal/platform/db/sqlc/schemas.sql, modules/payments/db/migrations]
+    queries: modules/payments/db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: modules/payments/internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true

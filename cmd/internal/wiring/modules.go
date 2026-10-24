@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"subscription-platform/internal/platform/config"
 	"subscription-platform/internal/platform/httpx"
 	"subscription-platform/internal/platform/messaging"
 	"subscription-platform/internal/platform/scheduler"
@@ -14,6 +15,8 @@ import (
 	catalogcontracts "subscription-platform/modules/catalog/contracts"
 	"subscription-platform/modules/customer"
 	customercontracts "subscription-platform/modules/customer/contracts"
+	"subscription-platform/modules/payments"
+	paymentscontracts "subscription-platform/modules/payments/contracts"
 	"subscription-platform/modules/subscription"
 	subscriptioncontracts "subscription-platform/modules/subscription/contracts"
 	"subscription-platform/modules/tenant"
@@ -37,6 +40,7 @@ type Services struct {
 	Customer     customercontracts.Service
 	Catalog      catalogcontracts.Service
 	Subscription subscriptioncontracts.Service
+	Payments     paymentscontracts.Service
 }
 
 // modules はプロセスに組み込むモジュール。マイグレーションの順序（tenant → … → audit）で並べる。
@@ -49,12 +53,24 @@ func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 	c := customer.New(customer.Deps{Pool: b.Pool, Clock: b.Clock})
 	cat := catalog.New(catalog.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Tenants: t.Service(), ReservationTTL: b.Cfg.CatalogCouponReservationTTL})
 	sub := subscription.New(subscription.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Catalog: cat.Service()})
-	b.Services = Services{Tenant: t.Service(), Customer: c.Service(), Catalog: cat.Service(), Subscription: sub.Service()}
+	pay, err := payments.New(payments.Deps{
+		Pool: b.Pool, Clock: b.Clock, Cursors: codec, Methods: b.Cfg.PaymentsMethods, EnableStub: config.DevtoolsBuild, StubSecret: b.Cfg.StubWebhookSecret,
+		FincodeAPIBaseURL: b.Cfg.FincodeAPIBaseURL, FincodeSecretKey: b.Cfg.FincodeSecretKey, FincodePublicKey: b.Cfg.FincodePublicKey,
+		SendProviderEvent: func(ctx context.Context, body string) error {
+			return b.SendToQueue(ctx, "payments-provider-events", body)
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	b.Services = Services{Tenant: t.Service(), Customer: c.Service(), Catalog: cat.Service(), Subscription: sub.Service(), Payments: pay.Service()}
+	b.devMounts = append(b.devMounts, pay.MountDev)
 	return []ModuleSet{
 		{Name: tenant.Name, HasOutbox: true, MountHTTP: t.MountHTTP, Ports: tenantPorts(t.Service())},
 		{Name: customer.Name, HasOutbox: true, MountHTTP: c.MountHTTP, Ports: func(p *httpx.Ports) { p.ResolveConsumer = c.ResolveConsumer }},
 		{Name: catalog.Name, HasOutbox: true, MountHTTP: cat.MountHTTP, Jobs: cat.Jobs()},
 		{Name: subscription.Name, HasOutbox: true, MountHTTP: sub.MountHTTP, Jobs: sub.Jobs()},
+		{Name: payments.Name, HasOutbox: true, MountHTTP: pay.MountHTTP, Consumers: pay.Consumers(), Jobs: pay.Jobs()},
 	}, nil
 }
 

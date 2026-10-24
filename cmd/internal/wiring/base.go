@@ -21,6 +21,7 @@ import (
 	"subscription-platform/internal/platform/awsx"
 	"subscription-platform/internal/platform/config"
 	"subscription-platform/internal/platform/db"
+	"subscription-platform/internal/platform/httpx"
 	"subscription-platform/internal/platform/messaging"
 	"subscription-platform/internal/platform/observability"
 	"subscription-platform/internal/platform/scheduler"
@@ -38,7 +39,8 @@ type Base struct {
 	Topology  messaging.Topology
 	Schedules scheduler.Schedules
 	Clock     sk.Clock
-	Services  Services // modules() が組み立てた contracts（devtools の一括シードが使う）
+	Services  Services                    // modules() が組み立てた contracts（devtools の一括シードが使う）
+	devMounts []func(*httpx.Router) error // モジュールの devtools だけのルート（registerDev が登録する）
 }
 
 // NewBase は設定・ログ・DB・AWS・配線を用意する。

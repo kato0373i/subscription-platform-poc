@@ -1,0 +1,107 @@
+# 運営者の決済の確認と手動確定・照合結果（payments.md §7.5〜§7.7）。主体は operator。
+openapi: 3.0.3
+info: {title: ops-payments, version: "1"}
+paths:
+  /v1/ops/payment-attempts/{attempt_id}:
+    get:
+      operationId: opsGetPaymentAttempt
+      parameters:
+        - {$ref: '#/components/parameters/AttemptIDPath'}
+      responses:
+        "200": {description: 試行の全項目, content: {application/json: {schema: {$ref: '#/components/schemas/Attempt'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/payment-attempts/{attempt_id}/resolve:
+    post:
+      operationId: opsResolvePaymentAttempt
+      parameters:
+        - {$ref: '#/components/parameters/AttemptIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [outcome, note]
+              properties:
+                outcome: {type: string, enum: [succeeded, failed]}
+                failure_code: {type: string}
+                retryable: {type: boolean}
+                note: {type: string, minLength: 1, maxLength: 500}
+                force: {type: boolean}
+      responses:
+        "200": {description: 確定後の試行, content: {application/json: {schema: {$ref: '#/components/schemas/Attempt'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/reconciliation-reports:
+    get:
+      operationId: opsListReconciliationReports
+      parameters:
+        - {name: business_date, in: query, schema: {type: string, format: date}}
+        - {name: status, in: query, schema: {type: string, enum: [open, acknowledged]}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 照合の不整合
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, business_date, provider, kind, attempt_id, tenant_id, provider_order_ref, detail, status, detected_at]
+                      properties:
+                        id: {type: string, format: uuid}
+                        business_date: {type: string, format: date}
+                        provider: {type: string}
+                        kind: {type: string}
+                        attempt_id: {type: string, format: uuid, nullable: true}
+                        tenant_id: {type: string, format: uuid, nullable: true}
+                        provider_order_ref: {type: string}
+                        detail: {type: object}
+                        status: {type: string}
+                        detected_at: {type: string, format: date-time}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    AttemptIDPath: {name: attempt_id, in: path, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    Attempt:
+      type: object
+      required: [id, tenant_id, payable, customer_account_id, payment_method_id, method_type, provider, amount, idempotency_key, collection_seq,
+        provider_order_ref, status, failure_code, retryable, provider_raw_code, resolution, resolved_by, resolve_note, check_count, requested_at, finalized_at]
+      properties:
+        id: {type: string, format: uuid}
+        tenant_id: {type: string, format: uuid}
+        payable:
+          type: object
+          required: [type, id]
+          properties:
+            type: {type: string}
+            id: {type: string}
+        customer_account_id: {type: string, format: uuid}
+        payment_method_id: {type: string, format: uuid}
+        method_type: {type: string}
+        provider: {type: string}
+        amount: {type: integer, format: int64}
+        idempotency_key: {type: string}
+        collection_seq: {type: integer}
+        provider_order_ref: {type: string, nullable: true}
+        status: {type: string, enum: [processing, pending_async, succeeded, failed, unknown]}
+        failure_code: {type: string, nullable: true}
+        retryable: {type: boolean, nullable: true}
+        provider_raw_code: {type: string, nullable: true}
+        resolution: {type: string, nullable: true}
+        resolved_by: {type: string, nullable: true}
+        resolve_note: {type: string, nullable: true}
+        check_count: {type: integer}
+        requested_at: {type: string, format: date-time}
+        finalized_at: {type: string, format: date-time, nullable: true}

@@ -35,7 +35,14 @@ export type ErrorCode =
   | "cancellation_scheduled"
   | "cancellation_not_revocable"
   | "plan_change_not_allowed"
-  | "trial_not_eligible";
+  | "trial_not_eligible"
+  | "payment_method_limit_exceeded"
+  | "invalid_payment_token"
+  | "unsupported_payment_method"
+  | "attempt_already_finalized"
+  | "attempt_not_resolvable"
+  | "outcome_mismatch"
+  | "payable_already_paid";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -73,4 +80,11 @@ export const errorStatus: Record<ErrorCode, number> = {
   cancellation_not_revocable: 409,
   plan_change_not_allowed: 422,
   trial_not_eligible: 422,
+  payment_method_limit_exceeded: 422,
+  invalid_payment_token: 422,
+  unsupported_payment_method: 422,
+  attempt_already_finalized: 409,
+  attempt_not_resolvable: 409,
+  outcome_mismatch: 409,
+  payable_already_paid: 409,
 };

@@ -24,3 +24,18 @@ queues:
     concurrency: 2
     visibility_timeout_s: 300
     max_receive: 3
+  # 退会に伴う支払方法の削除（payments.md §5.1）
+  - name: payments
+    process: worker-billing
+    consumer: payments.customer_withdrawn
+    events: [customer.withdrawn]
+    concurrency: 2
+    visibility_timeout_s: 60
+    max_receive: 5
+  # 決済代行の通知の処理（payments.md §8.2）。Webhook が Inbox に保存した後に直接送る（EventBridge を通さない）
+  - name: payments-provider-events
+    process: worker-billing
+    consumer: payments.provider_events
+    concurrency: 5
+    visibility_timeout_s: 60
+    max_receive: 5

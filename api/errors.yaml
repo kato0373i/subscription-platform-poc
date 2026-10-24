@@ -176,3 +176,38 @@ codes:
     title: このプランのトライアルは利用済みです
     owner: subscription
     description: 同じ商品のトライアルを使った契約者の申込（申込 API が返す。FR-014）
+  - code: payment_method_limit_exceeded
+    status: 422
+    title: 登録できる支払方法の上限に達しています
+    owner: payments
+    description: 有効な支払方法は 1 人 10 件まで
+  - code: invalid_payment_token
+    status: 422
+    title: カード情報を確認できませんでした
+    owner: payments
+    description: トークンの形式不正・使用済み・決済代行が拒否
+  - code: unsupported_payment_method
+    status: 422
+    title: この支払方法は使えません
+    owner: payments
+    description: 手段と決済代行の組が有効でない
+  - code: attempt_already_finalized
+    status: 409
+    title: この決済は確定済みです
+    owner: payments
+    description: 確定済みの試行を別の結果にしようとした
+  - code: attempt_not_resolvable
+    status: 409
+    title: この決済はまだ手動で確定できません
+    owner: payments
+    description: 30 秒以内の処理中など
+  - code: outcome_mismatch
+    status: 409
+    title: 決済代行の結果と指定が違います
+    owner: payments
+    description: 手動確定の指定が代行の照会結果と食い違う（force で上書きできる）
+  - code: payable_already_paid
+    status: 409
+    title: この請求は支払い済みです
+    owner: payments
+    description: 成功した別の試行がある

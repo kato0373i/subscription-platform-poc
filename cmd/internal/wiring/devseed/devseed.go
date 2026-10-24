@@ -3,9 +3,10 @@
 // Package devseed は devtools ビルドだけの一括シード（platform.md §7.3、P-TST-10）。
 // 申込と同じ順で各モジュールの contracts だけを呼んで契約を作る（DB に直接書かない。archtest が contracts 以外の import を禁止する）。
 //
-// 段階 1（P-IMP-14）：payments・billing の実装前なので、支払方法と初回の請求は決定的な合成 ID で代用し、
-// customer → catalog → subscription（CreateForSignup → Activate）だけを通す。payments・billing の実装時に
-// RegisterPaymentMethod → IssueInvoice → Collect → RecordPaymentOutcome を挟む。
+// 段階 1（P-IMP-14）：customer → catalog → subscription（CreateForSignup → Activate）を通す。
+// 段階 2 の前半（P-IMP-15）：支払方法を payments.RegisterPaymentMethod（StubAdapter のトークン）で登録し、
+// 初回の決済を payments.Collect で行う。請求は billing の実装前なので、請求 ID は seed_id から決まる合成 ID
+// （冪等キー invoice:{合成 ID}:1）。決済が成功した契約だけ Activate する。billing の実装時に IssueInvoice・RecordPaymentOutcome を挟む。
 package devseed
 
 import (
@@ -26,6 +27,7 @@ import (
 	sk "subscription-platform/internal/sharedkernel"
 	catalogcontracts "subscription-platform/modules/catalog/contracts"
 	customercontracts "subscription-platform/modules/customer/contracts"
+	paymentscontracts "subscription-platform/modules/payments/contracts"
 	subcontracts "subscription-platform/modules/subscription/contracts"
 )
 
@@ -37,16 +39,18 @@ type Deps struct {
 	Customer     customercontracts.Service
 	Catalog      catalogcontracts.Service
 	Subscription subcontracts.Service
+	Payments     paymentscontracts.Service
 	Clock        sk.Clock
 	Scheduler    *scheduler.Service
 }
 
 // Params はジョブの params。
 type Params struct {
-	TenantID sk.TenantID `json:"tenant_id"`
-	PlanID   sk.PlanID   `json:"plan_id"`
-	Count    int         `json:"count"`
-	SeedID   string      `json:"seed_id"`
+	TenantID        sk.TenantID `json:"tenant_id"`
+	PlanID          sk.PlanID   `json:"plan_id"`
+	Count           int         `json:"count"`
+	SeedID          string      `json:"seed_id"`
+	PaymentScenario string      `json:"payment_scenario"` // StubAdapter のシナリオ（既定 ok）
 }
 
 // Register は POST /v1/dev/seed/subscriptions を登録する（api プロセス）。
@@ -77,6 +81,9 @@ func seed(w http.ResponseWriter, req *http.Request, d Deps) {
 	}
 	if p.SeedID == "" {
 		p.SeedID = uuid.NewString()[:8]
+	}
+	if p.PaymentScenario == "" {
+		p.PaymentScenario = "ok"
 	}
 	params, _ := json.Marshal(p)
 	res, err := d.Scheduler.Enqueue(req.Context(), JobName, scheduler.EnqueueOptions{Trigger: scheduler.TriggerDev, Params: params, Force: true})
@@ -148,14 +155,36 @@ func (j job) one(ctx context.Context, p Params, plan catalogcontracts.PlanSnapsh
 	if err != nil {
 		return subcontracts.SubscriptionView{}, err
 	}
+	pm, err := j.d.Payments.RegisterPaymentMethod(ctx, paymentscontracts.RegisterPaymentMethodCmd{
+		CustomerAccountID: acct.ID, MethodType: paymentscontracts.MethodCard, Provider: "stub", IdempotencyKey: "seed:" + sub,
+		Token: fmt.Sprintf("tok_stub_%s_4242_1230_%s", p.PaymentScenario, synthetic(p.SeedID, n, "token").String()[:8]),
+	})
+	if err != nil {
+		return subcontracts.SubscriptionView{}, fmt.Errorf("register payment method: %w", err)
+	}
 	v, err := j.d.Subscription.CreateForSignup(ctx, subcontracts.CreateSignupCmd{
-		TenantID: p.TenantID, CustomerAccountID: acct.ID, TenantCustomerID: string(cus), SignupRequestID: sub,
+		SubscriptionID: sk.IDFromUUID[sk.SubscriptionTag](synthetic(p.SeedID, n, "subscription")),
+		TenantID:       p.TenantID, CustomerAccountID: acct.ID, TenantCustomerID: string(cus), SignupRequestID: sub,
 		Plan:            subcontracts.PlanInput{PlanID: plan.PlanID, ProductID: plan.ProductID, PriceVersionID: plan.PriceVersionID, Interval: plan.Interval, TrialDays: plan.TrialDays},
-		PaymentMethodID: sk.IDFromUUID[sk.PaymentMethodTag](synthetic(p.SeedID, n, "payment_method")),
+		PaymentMethodID: pm.ID,
 		SignupDate:      today,
 	})
 	if err != nil {
 		return subcontracts.SubscriptionView{}, err
 	}
-	return j.d.Subscription.Activate(ctx, v.ID, sk.IDFromUUID[sk.InvoiceTag](synthetic(p.SeedID, n, "invoice")))
+	if v.Status != subcontracts.StatusPendingInitial {
+		return v, nil // 再実行（作成済み）
+	}
+	invoice := sk.IDFromUUID[sk.InvoiceTag](synthetic(p.SeedID, n, "invoice"))
+	res, err := j.d.Payments.Collect(ctx, paymentscontracts.CollectCmd{
+		TenantID: p.TenantID, CustomerAccountID: acct.ID, Payable: paymentscontracts.PayableRef{Type: paymentscontracts.PayableInvoice, ID: invoice.String()},
+		Amount: plan.Amount, PaymentMethodID: pm.ID, IdempotencyKey: paymentscontracts.IdempotencyKeyFor(invoice, 1),
+	})
+	if err != nil {
+		return subcontracts.SubscriptionView{}, fmt.Errorf("collect: %w", err)
+	}
+	if res.Status != paymentscontracts.AttemptSucceeded {
+		return subcontracts.SubscriptionView{}, fmt.Errorf("collect: attempt %s is %s", res.AttemptID, res.Status)
+	}
+	return j.d.Subscription.Activate(ctx, v.ID, invoice)
 }

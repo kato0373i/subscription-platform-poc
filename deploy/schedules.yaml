@@ -37,3 +37,18 @@ jobs:
     process: worker-billing
     dedupe: none
     devtools: true
+  # 結果不明の決済の照合（payments.md §8.1。PoC は 1 分ごと）
+  - name: payments-resolve-unknown
+    process: worker-billing
+    schedule: "cron(* * * * ? *)"
+    dedupe: none
+  # 送り損ねた決済代行の通知の送り直し（§8.2）
+  - name: payments-provider-events-sweep
+    process: worker-billing
+    schedule: "cron(* * * * ? *)"
+    dedupe: none
+  # 日次照合（§8.3。毎日 03:00 JST、前日分）
+  - name: payments-reconcile-daily
+    process: worker-billing
+    schedule: "cron(0 3 * * ? *)"
+    dedupe: daily

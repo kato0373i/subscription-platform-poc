@@ -21,7 +21,8 @@ var Modules = []string{"tenant", "customer", "catalog", "subscription", "billing
 // Source はスキーマ 1 つ分のマイグレーション。
 type Source struct {
 	Schema string
-	FS     fs.FS // ルートに *.sql がある
+	FS     fs.FS  // ルートに *.sql がある
+	Table  string // goose のバージョン表。省略時は "<schema>.goose_db_version"。devtools だけのマイグレーションは別の表を使う
 }
 
 // Options は bootstrap の設定。
@@ -127,7 +128,11 @@ func openOwnerDB(url string) (*sql.DB, error) {
 }
 
 func provider(db *sql.DB, src Source) (*goose.Provider, error) {
-	store, err := database.NewStore(database.DialectPostgres, src.Schema+".goose_db_version")
+	table := src.Table
+	if table == "" {
+		table = src.Schema + ".goose_db_version"
+	}
+	store, err := database.NewStore(database.DialectPostgres, table)
 	if err != nil {
 		return nil, fmt.Errorf("migrate: store: %w", err)
 	}
@@ -176,7 +181,11 @@ func Status(ctx context.Context, url string, sources []Source) (map[string]int64
 		if err != nil {
 			return nil, fmt.Errorf("migrate status %s: %w", src.Schema, err)
 		}
-		out[src.Schema] = v
+		key := src.Schema
+		if src.Table != "" {
+			key = src.Table
+		}
+		out[key] = v
 	}
 	return out, nil
 }

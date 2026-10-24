@@ -25,7 +25,7 @@ export interface World {
   createStaff(tenant: TenantWorld, role: "owner" | "admin" | "operator" | "viewer"): Promise<{ token: string; sub: string }>;
   createConsumer(): Promise<ConsumerWorld>;
   createPaymentMethod(consumer: ConsumerWorld, scenario?: string): Promise<{ id: string }>;
-  seedSubscriptions(tenant: TenantWorld, planId: string, count: number): Promise<{ seedId: string; firstRenewalDate: string }>;
+  seedSubscriptions(tenant: TenantWorld, planId: string, count: number, paymentScenario?: string): Promise<{ seedId: string; firstRenewalDate: string; created: number; failed: number }>;
 }
 
 let seq = 0;
@@ -80,15 +80,22 @@ export function createWorld(api: Api, tokens: Tokens, wait: Wait, testTag: strin
       expect(res.status, JSON.stringify(res.body)).toBe(201);
       return { id: res.body.id };
     },
-    async seedSubscriptions(tenant, planId, count) {
-      const res = await api.call<{ seed_id: string; run_id: string }>("POST", "/v1/dev/seed/subscriptions", { body: { tenant_id: tenant.id, plan_id: planId, count } });
+    async seedSubscriptions(tenant, planId, count, paymentScenario) {
+      const res = await api.call<{ seed_id: string; run_id: string }>("POST", "/v1/dev/seed/subscriptions", {
+        body: { tenant_id: tenant.id, plan_id: planId, count, payment_scenario: paymentScenario },
+      });
       expect(res.status, JSON.stringify(res.body)).toBe(202);
       const done = await wait.until(async () => {
         const r = await api.call<{ status: string; stats: Record<string, unknown> }>("GET", `/v1/dev/job-runs/${res.body.run_id}`);
         if (r.body.status === "failed") throw new Error(`seed failed: ${JSON.stringify(r.body)}`);
         return r.body.status === "succeeded" ? r.body : undefined;
       }, { timeout: 30 * 60_000, interval: 2_000, message: "一括シードの完了" });
-      return { seedId: res.body.seed_id, firstRenewalDate: String(done.stats.first_renewal_date) };
+      return {
+        seedId: res.body.seed_id,
+        firstRenewalDate: String(done.stats.first_renewal_date),
+        created: Number(done.stats.created ?? 0),
+        failed: Number(done.stats.failed ?? 0),
+      };
     },
   };
 }

@@ -1,0 +1,58 @@
+# devtools ビルドだけの StubAdapter の操作（payments.md §7.8）。認証なし。
+openapi: 3.0.3
+info: {title: dev-payments, version: "1"}
+paths:
+  /v1/dev/payments/stub/charges/{provider_order_ref}/settle:
+    post:
+      operationId: devStubSettleCharge
+      parameters:
+        - {name: provider_order_ref, in: path, required: true, schema: {type: string, maxLength: 128}}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SettleRequest'}
+      responses:
+        "202": {description: 確定し、署名した通知を Webhook の経路に流した}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/dev/payments/stub/payables/invoice/{invoice_id}/settle:
+    post:
+      operationId: devStubSettleInvoice
+      parameters:
+        - {name: invoice_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/SettleRequest'}
+      responses:
+        "202": {description: 請求の進行中の試行を確定した}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/dev/payments/stub/payment-methods/{payment_method_id}/behavior:
+    put:
+      operationId: devStubSetBehavior
+      parameters:
+        - {name: payment_method_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [scenario, remaining]
+              properties:
+                scenario: {type: string}
+                remaining: {type: integer, minimum: 0}
+      responses:
+        "204": {description: 設定した}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    SettleRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        result: {type: string, enum: [succeeded, failed]}
+        failure_code: {type: string}

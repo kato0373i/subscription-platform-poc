@@ -865,3 +865,4 @@ CREATE TABLE stub_charges (order_ref text PRIMARY KEY, idempotency_key text NOT 
   created_at timestamptz NOT NULL, settled_at timestamptz);
 -- 共通: outbox_events, processed_messages（Platform の定義どおり）
 ```
+| 2026-10-25 | 実装時の決定を反映（P-IMP-15）：StubAdapter は登録だけを devtools に限る、Stub の表は devtools の migrate だけ（バージョン表を分ける）、ジョブ名を `payments-<name>` に、通知の処理の依頼は EventEnvelope で SQS に直接送る、dev の settle は `IngestWebhook` に直接渡す、`reconciliation_discrepancies` にも tenant の RLS。実装の状況は `docs/poc/impl/payments.md` | PdM |

@@ -8,6 +8,7 @@ import (
 
 	"subscription-platform/cmd/internal/wiring/devseed"
 	"subscription-platform/internal/platform/db"
+	"subscription-platform/internal/platform/db/migrate"
 	"subscription-platform/internal/platform/devapi"
 	"subscription-platform/internal/platform/devclock"
 	"subscription-platform/internal/platform/httpx"
@@ -18,6 +19,9 @@ import (
 	sk "subscription-platform/internal/sharedkernel"
 )
 
+// devMigrationSources は devtools ビルドだけのマイグレーション（StubAdapter の表）。
+func devMigrationSources() []migrate.Source { return []migrate.Source{paymentsDevtoolsSource()} }
+
 // newClock は devtools ビルドでは dev clock（実時刻 + offset、1 秒キャッシュ）。
 func newClock(pool *db.Pool) sk.Clock { return devclock.New(pool) }
 
@@ -25,12 +29,20 @@ func registerDev(r *httpx.Router, b *Base, key *ecdsa.PrivateKey) error {
 	if err := devapi.Register(r, devapi.Deps{Pool: b.Pool, Clock: b.Clock.(*devclock.Clock), Scheduler: b.SchedulerService(), DevKey: key}); err != nil {
 		return err
 	}
-	return devseed.Register(r, seedDeps(b))
+	if err := devseed.Register(r, seedDeps(b)); err != nil {
+		return err
+	}
+	for _, mount := range b.devMounts {
+		if err := mount(r); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func seedDeps(b *Base) devseed.Deps {
 	s := b.Services
-	return devseed.Deps{Customer: s.Customer, Catalog: s.Catalog, Subscription: s.Subscription, Clock: b.Clock, Scheduler: b.SchedulerService()}
+	return devseed.Deps{Customer: s.Customer, Catalog: s.Catalog, Subscription: s.Subscription, Payments: s.Payments, Clock: b.Clock, Scheduler: b.SchedulerService()}
 }
 
 // platformParts は platform 自身の購読者とジョブ。

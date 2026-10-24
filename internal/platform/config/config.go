@@ -52,7 +52,13 @@ type Config struct {
 	SlowQuery time.Duration
 
 	CatalogCouponReservationTTL time.Duration // 放置されたクーポンの予約を解放するまでの時間（catalog.md §8）
-	ShutdownSec                 int
+
+	PaymentsMethods   string // 新規登録に使う手段と代行（payments.md §4.4。例 "card:stub"）
+	StubWebhookSecret string // StubAdapter の Webhook の署名鍵（devtools のみ）
+	FincodeAPIBaseURL string
+	FincodeSecretKey  string
+	FincodePublicKey  string
+	ShutdownSec       int
 }
 
 // Getenv は環境変数の取得元（テストで差し替える）。
@@ -182,6 +188,16 @@ func LoadFrom(service string, env Getenv, devtools bool) (Config, error) {
 		errs = append(errs, fmt.Errorf("DB_SLOW_QUERY_MS: invalid %q", get("DB_SLOW_QUERY_MS", "200")))
 	}
 	c.SlowQuery = time.Duration(ms) * time.Millisecond
+	defMethods := ""
+	if devtools {
+		defMethods = "card:stub"
+	}
+	c.PaymentsMethods = get("PAYMENTS_METHODS", defMethods)
+	c.StubWebhookSecret = get("STUB_WEBHOOK_SECRET", "")
+	if devtools && c.StubWebhookSecret == "" {
+		c.StubWebhookSecret = "local-stub-webhook-secret" //nolint:gosec // devtools ビルドだけの既定値（ローカルの StubAdapter 用）
+	}
+	c.FincodeAPIBaseURL, c.FincodeSecretKey, c.FincodePublicKey = get("FINCODE_API_BASE_URL", ""), get("FINCODE_SECRET_KEY", ""), get("FINCODE_PUBLIC_KEY", "")
 	if d, err := time.ParseDuration(get("CATALOG_COUPON_RESERVATION_TTL", "24h")); err != nil || d <= 0 {
 		errs = append(errs, fmt.Errorf("CATALOG_COUPON_RESERVATION_TTL: invalid %q", get("CATALOG_COUPON_RESERVATION_TTL", "24h")))
 	} else {

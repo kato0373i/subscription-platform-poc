@@ -7,6 +7,7 @@ import (
 	"crypto/ecdsa"
 
 	"subscription-platform/internal/platform/db"
+	"subscription-platform/internal/platform/db/migrate"
 	"subscription-platform/internal/platform/httpx"
 	"subscription-platform/internal/platform/messaging"
 	"subscription-platform/internal/platform/scheduler"
@@ -14,6 +15,9 @@ import (
 )
 
 func newClock(_ *db.Pool) sk.Clock { return sk.SystemClock{} }
+
+// devMigrationSources は本番のビルドでは空（StubAdapter の表を作らない）。
+func devMigrationSources() []migrate.Source { return nil }
 
 // registerDev は本番のビルドでは何もしない（/v1/dev/* は 404。AC-PLT-042）。
 func registerDev(_ *httpx.Router, _ *Base, _ *ecdsa.PrivateKey) error { return nil }
