@@ -10,6 +10,9 @@ export type { paths as ConsoleSubscriptionPaths, components as ConsoleSubscripti
 export type { paths as TenantSubscriptionPaths, components as TenantSubscriptionComponents } from "./gen/tenant-subscription.ts";
 export type { paths as MePaymentsPaths, components as MePaymentsComponents } from "./gen/me-payments.ts";
 export type { paths as OpsPaymentsPaths, components as OpsPaymentsComponents } from "./gen/ops-payments.ts";
+export type { paths as MeBillingPaths, components as MeBillingComponents } from "./gen/me-billing.ts";
+export type { paths as ConsoleBillingPaths, components as ConsoleBillingComponents } from "./gen/console-billing.ts";
+export type { paths as OpsBillingPaths, components as OpsBillingComponents } from "./gen/ops-billing.ts";
 export type { ErrorCode } from "./error-codes.ts";
 export { errorStatus } from "./error-codes.ts";
 

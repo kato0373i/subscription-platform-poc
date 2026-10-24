@@ -1,0 +1,104 @@
+# 事業者コンソールの請求の照会とリトライの方針（billing.md §7.2・§7.4）。主体は staff、ヘッダー X-Tenant-Id 必須。
+openapi: 3.0.3
+info: {title: console-billing, version: "1"}
+paths:
+  /v1/console/subscriptions/{subscription_id}/invoices:
+    get:
+      operationId: consoleListInvoices
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant's invoices (another tenant's subscription is an empty list via RLS)
+      parameters:
+        - {name: subscription_id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 請求の一覧（period_start の新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Invoice'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/invoices/{invoice_id}:
+    get:
+      operationId: consoleGetInvoice
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {name: invoice_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: 請求, content: {application/json: {schema: {$ref: '#/components/schemas/Invoice'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/dunning-policy:
+    get:
+      operationId: consoleGetDunningPolicy
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:returns only the X-Tenant-Id tenant's policy
+      responses:
+        "200": {description: リトライの方針（未設定ならデフォルト）, content: {application/json: {schema: {$ref: '#/components/schemas/DunningPolicy'}}}}
+    put:
+      operationId: consolePutDunningPolicy
+      x-sp-permission: dunning.write
+      x-sp-isolation: not_applicable:updates only the X-Tenant-Id tenant's policy
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [retry_offsets_days]
+              properties:
+                retry_offsets_days: {type: array, items: {type: integer}}
+      responses:
+        "200": {description: 保存後の方針, content: {application/json: {schema: {$ref: '#/components/schemas/DunningPolicy'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    Invoice:
+      type: object
+      required: [id, subscription_id, status, kind, collection_mode, period, subtotal, discount_total, total, tax, lines, issued_at, paid_at, next_collection_at,
+        attempt_count, dunning_stage, dunning_schedule, collection_seq, last_failure_code, retryable, voided_at, void_reason, uncollectible_at]
+      properties:
+        id: {type: string, format: uuid}
+        subscription_id: {type: string, format: uuid}
+        status: {type: string, enum: [open, processing, payment_unknown, paid, uncollectible, void]}
+        kind: {type: string, enum: [initial, renewal]}
+        collection_mode: {type: string, enum: [scheduled, caller_managed]}
+        period: {$ref: '../me/billing.yaml#/components/schemas/Period'}
+        subtotal: {type: integer, format: int64}
+        discount_total: {type: integer, format: int64}
+        total: {type: integer, format: int64}
+        tax: {$ref: '../me/billing.yaml#/components/schemas/Tax'}
+        lines: {type: array, items: {$ref: '../me/billing.yaml#/components/schemas/Line'}}
+        issued_at: {type: string, format: date-time}
+        paid_at: {type: string, format: date-time, nullable: true}
+        next_collection_at: {type: string, format: date-time, nullable: true}
+        attempt_count: {type: integer}
+        dunning_stage: {type: integer}
+        dunning_schedule:
+          type: object
+          nullable: true
+          required: [offsets_days, first_failed_on]
+          properties:
+            offsets_days: {type: array, items: {type: integer}}
+            first_failed_on: {type: string, format: date}
+        collection_seq: {type: integer}
+        last_failure_code: {type: string, nullable: true}
+        retryable: {type: boolean, nullable: true}
+        voided_at: {type: string, format: date-time, nullable: true}
+        void_reason: {type: string, nullable: true}
+        uncollectible_at: {type: string, format: date-time, nullable: true}
+    DunningPolicy:
+      type: object
+      required: [retry_offsets_days, is_default, updated_at]
+      properties:
+        retry_offsets_days: {type: array, items: {type: integer}}
+        is_default: {type: boolean}
+        updated_at: {type: string, format: date-time, nullable: true}

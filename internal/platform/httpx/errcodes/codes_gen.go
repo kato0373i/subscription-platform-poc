@@ -91,6 +91,10 @@ const (
 	OutcomeMismatch Code = "outcome_mismatch"
 	// PayableAlreadyPaid は この請求は支払い済みです（409、owner: payments）。
 	PayableAlreadyPaid Code = "payable_already_paid"
+	// InvoiceNotCollectible は この請求は回収できません（409、owner: billing）。
+	InvoiceNotCollectible Code = "invoice_not_collectible"
+	// CollectionInProgress は この請求は決済の結果待ちです（409、owner: billing）。
+	CollectionInProgress Code = "collection_in_progress"
 )
 
 // Info はコードの HTTP ステータスと題名。
@@ -144,6 +148,8 @@ var All = map[Code]Info{
 	AttemptNotResolvable:       {Status: 409, Title: "この決済はまだ手動で確定できません", Owner: "payments"},
 	OutcomeMismatch:            {Status: 409, Title: "決済代行の結果と指定が違います", Owner: "payments"},
 	PayableAlreadyPaid:         {Status: 409, Title: "この請求は支払い済みです", Owner: "payments"},
+	InvoiceNotCollectible:      {Status: 409, Title: "この請求は回収できません", Owner: "billing"},
+	CollectionInProgress:       {Status: 409, Title: "この請求は決済の結果待ちです", Owner: "billing"},
 }
 
 // Status はコードの HTTP ステータス（未登録なら 500）。

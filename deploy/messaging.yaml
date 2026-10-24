@@ -24,6 +24,14 @@ queues:
     concurrency: 2
     visibility_timeout_s: 300
     max_receive: 3
+  # 決済の結果を請求に反映する（billing.md §5）
+  - name: billing-payments
+    process: worker-billing
+    consumer: billing.payment_outcome
+    events: [payments.payment_succeeded, payments.payment_failed, payments.payment_pending, payments.payment_outcome_unknown]
+    concurrency: 5
+    visibility_timeout_s: 60
+    max_receive: 5
   # 退会に伴う支払方法の削除（payments.md §5.1）
   - name: payments
     process: worker-billing

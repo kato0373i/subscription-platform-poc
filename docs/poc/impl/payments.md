@@ -18,7 +18,7 @@
 | app | Collect（Tx1 → 送信 → Tx2、E-01〜E-10）、結果不明の照合、Webhook の Inbox への保存と処理の依頼、通知の処理（SKIP LOCKED・ロック待ちは再試行を延ばす）、掃除、日次照合（`platform.job_cursors` で再開）、退会の処理、ops の手動確定 |
 | API | me（支払方法の登録・一覧）、checkout（payment-config）、ops（試行・手動確定・照合結果）、`POST /webhooks/{provider}`、dev（settle・挙動の上書き） |
 | 非同期 | キュー `payments`（customer.withdrawn）・`payments-provider-events`、ジョブ 3 つ（worker-billing） |
-| 一括シード | 段階 2 の前半：支払方法の登録と初回の決済を payments の contracts で通す（請求 ID は合成） |
+| 一括シード | 段階 2 の前半：支払方法の登録と初回の決済を payments の contracts で通す（billing の実装で請求 ID は本物の請求になった。P-IMP-16） |
 
 ## 2. 確かめたこと
 

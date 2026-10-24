@@ -211,3 +211,13 @@ codes:
     title: この請求は支払い済みです
     owner: payments
     description: 成功した別の試行がある
+  - code: invoice_not_collectible
+    status: 409
+    title: この請求は回収できません
+    owner: billing
+    description: 終端（paid / uncollectible / void）または caller_managed の請求に回収を要求した
+  - code: collection_in_progress
+    status: 409
+    title: この請求は決済の結果待ちです
+    owner: billing
+    description: processing / payment_unknown の請求に回収を要求した（先に試行を確定させる）

@@ -629,3 +629,4 @@ CREATE TABLE billing.dunning_policies (
 | 2026-10-13 | テスト方針（P-TST-1〜7）を反映。§11 にテストのレベルの定義を追加し、AC-BIL のレベルを unit（純粋なロジック）・integration（本物の DB。並行処理・部分ユニーク・RLS・冪等性）・e2e（Playwright）で付け直し、e2e には対応する E2E シナリオを記載。AC-BIL-039（E2E-022）を追加。スタブ前提の記述を削除。ステータスを Review に変更 | TL-Billing |
 | 2026-10-13 | P-TST-8 を反映。AC-BIL-032・034・038 の E2E シナリオ列に `e2e/tests/billing/dunning-policy.spec.ts`・`ops-collect.spec.ts` を記載。AC-BIL-031 は E2E-016 で確認（TL-Orchestration へ指示済み）。ステータスは Review のまま | TL-Billing |
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
+| 2026-10-25 | 実装時の決定（P-IMP-16）を反映：payments.* の payload は Billing の自前の型で読む、consumer_read は SELECT のみ、ID だけの contracts は事業者を引いてからテナントのスコープで更新、remaining_retries の定義、processing / payment_unknown への回収要求は caller_managed でも collection_in_progress、ジョブの dedupe は hourly、API の税率は "10%"。契約・状態遷移・イベントは変更なし | PdM |

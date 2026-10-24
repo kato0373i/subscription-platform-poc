@@ -5,8 +5,10 @@
 //
 // 段階 1（P-IMP-14）：customer → catalog → subscription（CreateForSignup → Activate）を通す。
 // 段階 2 の前半（P-IMP-15）：支払方法を payments.RegisterPaymentMethod（StubAdapter のトークン）で登録し、
-// 初回の決済を payments.Collect で行う。請求は billing の実装前なので、請求 ID は seed_id から決まる合成 ID
-// （冪等キー invoice:{合成 ID}:1）。決済が成功した契約だけ Activate する。billing の実装時に IssueInvoice・RecordPaymentOutcome を挟む。
+// 初回の決済を payments.Collect で行う。
+// 段階 2 の後半（P-IMP-16）：billing.IssueInvoice（initial・caller_managed）で請求を作り、冪等キー invoice:{請求 ID}:{collection_seq} で
+// 決済し、結果を billing.RecordPaymentOutcome（source=sync）で反映する。成功なら Activate、失敗なら請求を void にして MarkSignupFailed、
+// 確定待ち・結果不明は記録だけ（契約は pending_initial のまま）。
 package devseed
 
 import (
@@ -25,6 +27,7 @@ import (
 	"subscription-platform/internal/platform/observability"
 	"subscription-platform/internal/platform/scheduler"
 	sk "subscription-platform/internal/sharedkernel"
+	billingcontracts "subscription-platform/modules/billing/contracts"
 	catalogcontracts "subscription-platform/modules/catalog/contracts"
 	customercontracts "subscription-platform/modules/customer/contracts"
 	paymentscontracts "subscription-platform/modules/payments/contracts"
@@ -39,6 +42,7 @@ type Deps struct {
 	Customer     customercontracts.Service
 	Catalog      catalogcontracts.Service
 	Subscription subcontracts.Service
+	Billing      billingcontracts.Service
 	Payments     paymentscontracts.Service
 	Clock        sk.Clock
 	Scheduler    *scheduler.Service
@@ -175,16 +179,63 @@ func (j job) one(ctx context.Context, p Params, plan catalogcontracts.PlanSnapsh
 	if v.Status != subcontracts.StatusPendingInitial {
 		return v, nil // 再実行（作成済み）
 	}
-	invoice := sk.IDFromUUID[sk.InvoiceTag](synthetic(p.SeedID, n, "invoice"))
-	res, err := j.d.Payments.Collect(ctx, paymentscontracts.CollectCmd{
-		TenantID: p.TenantID, CustomerAccountID: acct.ID, Payable: paymentscontracts.PayableRef{Type: paymentscontracts.PayableInvoice, ID: invoice.String()},
-		Amount: plan.Amount, PaymentMethodID: pm.ID, IdempotencyKey: paymentscontracts.IdempotencyKeyFor(invoice, 1),
+	quote, err := j.d.Catalog.QuotePrice(ctx, p.TenantID, plan.PriceVersionID, nil)
+	if err != nil {
+		return subcontracts.SubscriptionView{}, fmt.Errorf("quote: %w", err)
+	}
+	inv, err := j.d.Billing.IssueInvoice(ctx, billingcontracts.IssueInvoiceCmd{
+		TenantID: p.TenantID, SubscriptionID: v.ID, CustomerAccountID: acct.ID, Period: v.CurrentPeriod,
+		PlanLine: billingcontracts.PlanLine{PriceVersionID: plan.PriceVersionID, Amount: quote.Amount, TaxRate: quote.TaxRate},
+		Kind:     billingcontracts.KindInitial, CollectionMode: billingcontracts.ModeCallerManaged,
 	})
 	if err != nil {
+		return subcontracts.SubscriptionView{}, fmt.Errorf("issue invoice: %w", err)
+	}
+	if inv.Status == billingcontracts.StatusPaid { // 0 円（ここでは起きないが申込と同じ扱い）
+		return j.d.Subscription.Activate(ctx, v.ID, inv.ID)
+	}
+	res, err := j.d.Payments.Collect(ctx, paymentscontracts.CollectCmd{
+		TenantID: p.TenantID, CustomerAccountID: acct.ID, Payable: paymentscontracts.PayableRef{Type: paymentscontracts.PayableInvoice, ID: inv.ID.String()},
+		Amount: inv.Total, PaymentMethodID: pm.ID, IdempotencyKey: paymentscontracts.IdempotencyKeyFor(inv.ID, inv.CollectionSeq),
+	})
+	if err != nil {
+		// 試行なし（provider_unavailable など）：申込の補償と同じく請求を void にしてから失敗にする（P-X-5）
+		j.fail(ctx, v.ID)
 		return subcontracts.SubscriptionView{}, fmt.Errorf("collect: %w", err)
 	}
-	if res.Status != paymentscontracts.AttemptSucceeded {
-		return subcontracts.SubscriptionView{}, fmt.Errorf("collect: attempt %s is %s", res.AttemptID, res.Status)
+	out := billingcontracts.PaymentOutcome{Amount: inv.Total, Source: billingcontracts.SourceSync}
+	switch res.Status {
+	case paymentscontracts.AttemptSucceeded:
+		out.Status = billingcontracts.OutcomeSucceeded
+	case paymentscontracts.AttemptFailed:
+		out.Status, out.Retryable = billingcontracts.OutcomeFailed, res.Retryable
+		if res.FailureCode != nil {
+			out.FailureCode = *res.FailureCode
+		}
+	case paymentscontracts.AttemptPendingAsync:
+		out.Status = billingcontracts.OutcomePending
+	default:
+		out.Status = billingcontracts.OutcomeUnknown
 	}
-	return j.d.Subscription.Activate(ctx, v.ID, invoice)
+	if _, err := j.d.Billing.RecordPaymentOutcome(ctx, inv.ID, res.AttemptID, out); err != nil {
+		return subcontracts.SubscriptionView{}, fmt.Errorf("record outcome: %w", err)
+	}
+	switch out.Status {
+	case billingcontracts.OutcomeSucceeded:
+		return j.d.Subscription.Activate(ctx, v.ID, inv.ID)
+	case billingcontracts.OutcomeFailed:
+		j.fail(ctx, v.ID)
+	case billingcontracts.OutcomePending, billingcontracts.OutcomeUnknown: // 記録だけ（契約は pending_initial のまま）
+	}
+	return subcontracts.SubscriptionView{}, fmt.Errorf("collect: attempt %s is %s", res.AttemptID, res.Status)
+}
+
+// fail は申込の失敗の補償（請求の void → 契約の失敗）。失敗はログだけ残す。
+func (j job) fail(ctx context.Context, sub sk.SubscriptionID) {
+	if _, err := j.d.Billing.VoidOpenInvoices(ctx, sub, billingcontracts.VoidSignupFailed); err != nil {
+		observability.Logger("platform.devseed").LogAttrs(ctx, slog.LevelWarn, "devseed.void_failed", observability.Err(err))
+	}
+	if err := j.d.Subscription.MarkSignupFailed(ctx, sub, "payment_failed"); err != nil {
+		observability.Logger("platform.devseed").LogAttrs(ctx, slog.LevelWarn, "devseed.mark_failed", observability.Err(err))
+	}
 }

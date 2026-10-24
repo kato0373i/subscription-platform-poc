@@ -42,7 +42,7 @@ func registerDev(r *httpx.Router, b *Base, key *ecdsa.PrivateKey) error {
 
 func seedDeps(b *Base) devseed.Deps {
 	s := b.Services
-	return devseed.Deps{Customer: s.Customer, Catalog: s.Catalog, Subscription: s.Subscription, Payments: s.Payments, Clock: b.Clock, Scheduler: b.SchedulerService()}
+	return devseed.Deps{Customer: s.Customer, Catalog: s.Catalog, Subscription: s.Subscription, Billing: s.Billing, Payments: s.Payments, Clock: b.Clock, Scheduler: b.SchedulerService()}
 }
 
 // platformParts は platform 自身の購読者とジョブ。

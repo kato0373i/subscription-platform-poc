@@ -3,6 +3,7 @@ package wiring
 import (
 	"subscription-platform/internal/platform/db"
 	"subscription-platform/internal/platform/db/migrate"
+	billingdb "subscription-platform/modules/billing/db"
 	catalogdb "subscription-platform/modules/catalog/db"
 	customerdb "subscription-platform/modules/customer/db"
 	paymentsdb "subscription-platform/modules/payments/db"
@@ -19,6 +20,7 @@ func MigrationSources() []migrate.Source {
 		{Schema: "customer", FS: migrate.SubFS(customerdb.Migrations, "migrations")},
 		{Schema: "catalog", FS: migrate.SubFS(catalogdb.Migrations, "migrations")},
 		{Schema: "subscription", FS: migrate.SubFS(subscriptiondb.Migrations, "migrations")},
+		{Schema: "billing", FS: migrate.SubFS(billingdb.Migrations, "migrations")},
 		{Schema: "payments", FS: migrate.SubFS(paymentsdb.Migrations, "migrations")},
 	}, devMigrationSources()...)
 }

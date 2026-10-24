@@ -1,0 +1,60 @@
+# 契約者の請求履歴（billing.md §7.1、FR-018）。主体は consumer。
+openapi: 3.0.3
+info: {title: me-billing, version: "1"}
+paths:
+  /v1/me/subscriptions/{subscription_id}/invoices:
+    get:
+      operationId: meListInvoices
+      x-sp-isolation: tested
+      parameters:
+        - {name: subscription_id, in: path, required: true, schema: {type: string, format: uuid}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 請求の一覧（period_start の新しい順）。自分の契約でない・存在しない ID は空の一覧
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/MeInvoice'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    MeInvoice:
+      type: object
+      required: [id, status, kind, period, total, tax, lines, issued_at, paid_at, next_collection_at]
+      properties:
+        id: {type: string, format: uuid}
+        status: {type: string, enum: [open, processing, paid, uncollectible, void], description: payment_unknown は processing として返す}
+        kind: {type: string, enum: [initial, renewal]}
+        period: {$ref: '#/components/schemas/Period'}
+        total: {type: integer, format: int64}
+        tax: {$ref: '#/components/schemas/Tax'}
+        lines: {type: array, items: {$ref: '#/components/schemas/Line'}}
+        issued_at: {type: string, format: date-time}
+        paid_at: {type: string, format: date-time, nullable: true}
+        next_collection_at: {type: string, format: date-time, nullable: true, description: open かつダニング中だけ}
+    Period:
+      type: object
+      required: [start, end]
+      properties:
+        start: {type: string, format: date}
+        end: {type: string, format: date}
+    Tax:
+      type: object
+      required: [rate, amount]
+      properties:
+        rate: {type: string, example: "10%"}
+        amount: {type: integer, format: int64}
+    Line:
+      type: object
+      required: [kind, description, amount]
+      properties:
+        kind: {type: string, enum: [plan, discount]}
+        description: {type: string}
+        amount: {type: integer, format: int64}

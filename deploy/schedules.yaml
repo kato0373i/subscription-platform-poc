@@ -27,6 +27,11 @@ jobs:
     process: worker-billing
     schedule: "cron(5 * * * ? *)"
     dedupe: hourly
+  # 回収時刻が来た請求の回収要求（billing.md §8。毎時 0 分 JST。10:00 JST に予定した請求は 10:00 の実行で拾う）
+  - name: billing-collection-due
+    process: worker-billing
+    schedule: "cron(0 * * * ? *)"
+    dedupe: hourly
   # トライアル終了の予告（subscription.md §8。毎日 09:00 JST）
   - name: subscription-trial-will-end
     process: worker-billing

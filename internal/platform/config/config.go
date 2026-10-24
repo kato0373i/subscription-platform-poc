@@ -52,6 +52,7 @@ type Config struct {
 	SlowQuery time.Duration
 
 	CatalogCouponReservationTTL time.Duration // 放置されたクーポンの予約を解放するまでの時間（catalog.md §8）
+	BillingCollectionLease      time.Duration // 回収要求のリース（billing.md §8。結果が届かなければ同じ collection_seq で再送する）
 
 	PaymentsMethods   string // 新規登録に使う手段と代行（payments.md §4.4。例 "card:stub"）
 	StubWebhookSecret string // StubAdapter の Webhook の署名鍵（devtools のみ）
@@ -202,6 +203,11 @@ func LoadFrom(service string, env Getenv, devtools bool) (Config, error) {
 		errs = append(errs, fmt.Errorf("CATALOG_COUPON_RESERVATION_TTL: invalid %q", get("CATALOG_COUPON_RESERVATION_TTL", "24h")))
 	} else {
 		c.CatalogCouponReservationTTL = d
+	}
+	if d, err := time.ParseDuration(get("BILLING_COLLECTION_LEASE", "6h")); err != nil || d <= 0 {
+		errs = append(errs, fmt.Errorf("BILLING_COLLECTION_LEASE: invalid %q", get("BILLING_COLLECTION_LEASE", "6h")))
+	} else {
+		c.BillingCollectionLease = d
 	}
 
 	if len(errs) > 0 {

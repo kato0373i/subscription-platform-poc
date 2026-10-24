@@ -42,7 +42,9 @@ export type ErrorCode =
   | "attempt_already_finalized"
   | "attempt_not_resolvable"
   | "outcome_mismatch"
-  | "payable_already_paid";
+  | "payable_already_paid"
+  | "invoice_not_collectible"
+  | "collection_in_progress";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -87,4 +89,6 @@ export const errorStatus: Record<ErrorCode, number> = {
   attempt_not_resolvable: 409,
   outcome_mismatch: 409,
   payable_already_paid: 409,
+  invoice_not_collectible: 409,
+  collection_in_progress: 409,
 };

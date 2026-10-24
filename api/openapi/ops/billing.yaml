@@ -1,0 +1,33 @@
+# 運営者の請求の再決済（billing.md §7.3、NFR-014）。主体は operator。
+openapi: 3.0.3
+info: {title: ops-billing, version: "1"}
+paths:
+  /v1/ops/invoices/{invoice_id}/collect:
+    post:
+      operationId: opsCollectInvoice
+      parameters:
+        - {name: invoice_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                note: {type: string, maxLength: 500}
+      responses:
+        "202":
+          description: 回収要求を出した（リース中の再呼び出しは同じ collection_seq）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [invoice_id, status, collection_seq, requested_at]
+                properties:
+                  invoice_id: {type: string, format: uuid}
+                  status: {type: string}
+                  collection_seq: {type: integer}
+                  requested_at: {type: string, format: date-time}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
