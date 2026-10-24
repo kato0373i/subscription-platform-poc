@@ -29,7 +29,7 @@
 | 001〜013 | ✅ | `internal/sharedkernel/*_test.go`（013 は fuzz） |
 | 014〜018 | ✅ | `internal/platform/db/db_integration_test.go` |
 | 019〜024 | ✅ | `internal/platform/messaging/integration_test.go`（023 は VT 2 秒・処理 5 秒に縮めて同じ性質を確かめる。020 は P-IMP-4） |
-| 025 | 一部 ✅ | `world` で作った consumer・staff・operator の主体で、正しい主体・別の主体 403・トークンなし 401 を identity の E2E（`me-account`・`ops-tenants`・`console-*`）で確かめた。tenant_api の入口（`/v1/tenant/*`）は subscription の実装後 |
+| 025 | ✅ | consumer・staff・operator は identity の E2E（`me-account`・`ops-tenants`・`console-*`）、tenant_api は `e2e/tests/subscription/tenant-subscriptions.spec.ts` |
 | 026・028 | ✅ | `internal/platform/httpx/httpx_test.go` |
 | 027 | ✅ | `e2e/tests/identity/console-authz.spec.ts`（所属していない 403、停止中の書き込みの `tenant_not_active`） |
 | 029・030・033 | ⏳ payments | Idempotency の仕組みは 031・032 で確かめ済み（キーなしの 400 も） |
@@ -55,7 +55,7 @@
 | 067 | ⏳ subscription | `world.createTenant` は identity の API で動く（identity の E2E で使用）。契約一覧での確認は subscription の実装後 |
 | 068・070 | ✅ | `e2e/tests/platform/clock-guard.spec.ts`・`wait.spec.ts`、`e2elint` |
 | 069 | ⏳ integration | `webhook-sink` 自体は `tools/webhook-sink` の UT で確かめ済み |
-| 072 | ⏳ 全ドメイン | `POST /v1/dev/seed/subscriptions`（`cmd/internal/wiring/devseed`）は各モジュールの contracts が必要 |
+| 072 | 一部 | `POST /v1/dev/seed/subscriptions` を段階 1 で実装（`cmd/internal/wiring/devseed`。P-IMP-14）。subscription の E2E で使っている。初回の請求が paid・100 件の確認は payments・billing の実装後（段階 2） |
 | 073・078 | ⏳ orchestration | `devlogs` と `domain.state_changed` の補助関数は実装済み |
 | 074 | ✅ | `task e2e:selftest`（`e2e/selftest/`） |
 | 076 | ✅（platform の範囲） | `e2e/tests/platform/log-redaction.spec.ts`（トークン・カード番号・Bearer・メールが平文で出ない）。カード登録・申込・API キーの流れは各ドメインの実装後 |

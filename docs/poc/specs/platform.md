@@ -1033,3 +1033,4 @@ e2e/
 | 2026-10-24 | 実装で確かめた MiniStack の制約と、実装時の決定を反映（P-OBS-10、P-IMP-1〜6）：ローカルは `SCHEDULER_MODE=internal`、結合テストと profile `db` の DB は `postgres:16-alpine`、Fluent Bit のための `ministack-tls`、AC-PLT-020 の障害の起こし方、配線の確認用の `platform-smoke`・`/v1/dev/smoke`・`platform-noop`、`platform` の SQL 関数をマイグレーションで作る、AC-PLT-077 の確かめ方。実装の状況は `docs/poc/impl/platform.md` | PdM |
 | 2026-10-24 | identity の実装時の決定を反映（P-IMP-7〜10）：§6.1 の `sp_owner` に BYPASSRLS、§4 に `db.WithUnscoped`。コード生成（§10.1）は `internal/tools/apigen`（oapi-codegen をライブラリとして呼ぶ）と sqlc のコンテナで動かす | PdM |
 | 2026-10-24 | catalog の実装時の決定を反映（P-IMP-12）：sharedkernel に `SubscriptionID`、`/v1/checkout/*` の任意の認証（consumer のトークンがあれば主体を置く）、監査注釈の安全網の例外（`product_name`・`plan_name`・`coupon_name`）、archtest の結合テストの例外、設定 `CATALOG_COUPON_RESERVATION_TTL` | PdM |
+| 2026-10-24 | subscription の実装時の決定を反映（P-IMP-14）：モジュールをまたぐ ID を sharedkernel に追加、`scheduler.Stats` を `map[string]any` に、一括シード（§7.3）を段階 1（payments・billing の前。支払方法と初回の請求は合成 ID）で実装 | PdM |

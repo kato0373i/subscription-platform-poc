@@ -5,6 +5,9 @@ export type { paths as ConsoleTenantPaths, components as ConsoleTenantComponents
 export type { paths as MeCustomerPaths, components as MeCustomerComponents } from "./gen/me-customer.ts";
 export type { paths as ConsoleCatalogPaths, components as ConsoleCatalogComponents } from "./gen/console-catalog.ts";
 export type { paths as CheckoutCatalogPaths, components as CheckoutCatalogComponents } from "./gen/checkout-catalog.ts";
+export type { paths as MeSubscriptionPaths, components as MeSubscriptionComponents } from "./gen/me-subscription.ts";
+export type { paths as ConsoleSubscriptionPaths, components as ConsoleSubscriptionComponents } from "./gen/console-subscription.ts";
+export type { paths as TenantSubscriptionPaths, components as TenantSubscriptionComponents } from "./gen/tenant-subscription.ts";
 export type { ErrorCode } from "./error-codes.ts";
 export { errorStatus } from "./error-codes.ts";
 

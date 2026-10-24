@@ -1,0 +1,66 @@
+# 事業者 API の契約の照会と利用権（subscription.md §7、FR-008）。主体は tenant_api（API キー）。
+openapi: 3.0.3
+info: {title: tenant-subscription, version: "1"}
+paths:
+  /v1/tenant/subscriptions:
+    get:
+      operationId: tenantListSubscriptions
+      x-sp-isolation: not_applicable:lists only the API key's tenant (RLS)
+      parameters:
+        - {name: customer_id, in: query, schema: {type: string, pattern: '^cus_[0-9A-Za-z]{24}$'}}
+        - {name: status, in: query, style: form, explode: true, schema: {type: array, items: {$ref: '../me/subscription.yaml#/components/schemas/Status'}}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 契約の一覧（作成の新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '../console/subscription.yaml#/components/schemas/Subscription'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "401": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/tenant/subscriptions/{subscription_id}:
+    get:
+      operationId: tenantGetSubscription
+      x-sp-isolation: tested
+      parameters:
+        - {name: subscription_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: 契約, content: {application/json: {schema: {$ref: '../console/subscription.yaml#/components/schemas/Subscription'}}}}
+        "401": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/tenant/customers/{customer_id}/entitlements:
+    get:
+      operationId: tenantGetEntitlements
+      x-sp-isolation: tested
+      parameters:
+        - {name: customer_id, in: path, required: true, schema: {type: string, pattern: '^cus_[0-9A-Za-z]{24}$'}}
+        - {name: product_id, in: query, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: 利用権（利用権のある契約が 1 件以上なら entitled）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [customer_id, entitled, products]
+                properties:
+                  customer_id: {type: string}
+                  entitled: {type: boolean}
+                  products:
+                    type: array
+                    items:
+                      type: object
+                      required: [product_id, entitled, subscription_ids]
+                      properties:
+                        product_id: {type: string, format: uuid}
+                        entitled: {type: boolean}
+                        subscription_ids: {type: array, items: {type: string, format: uuid}}
+        "401": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}

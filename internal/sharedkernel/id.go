@@ -78,9 +78,28 @@ type TenantID = ID[TenantTag]
 type CustomerAccountTag struct{}
 type CustomerAccountID = ID[CustomerAccountTag]
 
-// SubscriptionID はモジュールをまたいで渡す契約の ID（catalog のクーポンの予約、billing の請求など）。
-type SubscriptionTag struct{}
-type SubscriptionID = ID[SubscriptionTag]
+// 以下はモジュールをまたいで渡す ID（他モジュールの contracts を import せずに型を合わせるため。P-IMP-12・14）。
+type (
+	SubscriptionTag  struct{}
+	ProductTag       struct{}
+	PlanTag          struct{}
+	PriceVersionTag  struct{}
+	CouponTag        struct{}
+	RedemptionTag    struct{}
+	InvoiceTag       struct{}
+	PaymentMethodTag struct{}
+)
+
+type (
+	SubscriptionID  = ID[SubscriptionTag]
+	ProductID       = ID[ProductTag]
+	PlanID          = ID[PlanTag]
+	PriceVersionID  = ID[PriceVersionTag]
+	CouponID        = ID[CouponTag]
+	RedemptionID    = ID[RedemptionTag]
+	InvoiceID       = ID[InvoiceTag]
+	PaymentMethodID = ID[PaymentMethodTag]
+)
 
 type EventTag struct{}
 type EventID = ID[EventTag]

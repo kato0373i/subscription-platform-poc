@@ -1,0 +1,34 @@
+# devtools ビルドだけに含まれる一括シード（platform.md §7.3、P-TST-10）。各モジュールの contracts だけを通して契約を作る。認証なし。
+openapi: 3.0.3
+info: {title: dev-seed, version: "1"}
+paths:
+  /v1/dev/seed/subscriptions:
+    post:
+      operationId: devSeedSubscriptions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tenant_id, plan_id, count]
+              properties:
+                tenant_id: {type: string, format: uuid}
+                plan_id: {type: string, format: uuid}
+                count: {type: integer, minimum: 1, maximum: 20000}
+                payment_scenario: {type: string, description: StubAdapter のシナリオ（payments の実装後に使う）}
+                seed_id: {type: string, pattern: '^[A-Za-z0-9_-]{1,64}$'}
+      responses:
+        "202":
+          description: 投入した。進み具合は GET /v1/dev/job-runs/{run_id}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [seed_id, run_id]
+                properties:
+                  seed_id: {type: string}
+                  run_id: {type: string, format: uuid}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}

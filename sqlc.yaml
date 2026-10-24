@@ -8,6 +8,8 @@ overrides:
       - {db_type: uuid, nullable: true, go_type: {import: github.com/google/uuid, type: UUID, pointer: true}}
       - {db_type: timestamptz, go_type: time.Time}
       - {db_type: timestamptz, nullable: true, go_type: {import: time, type: Time, pointer: true}}
+      - {db_type: date, go_type: {import: subscription-platform/internal/sharedkernel, package: sk, type: Date}}
+      - {db_type: date, nullable: true, go_type: {import: subscription-platform/internal/sharedkernel, package: sk, type: Date, pointer: true}}
 sql:
   - engine: postgresql
     schema: [internal/platform/db/sqlc/schemas.sql, modules/tenant/db/migrations]
@@ -34,5 +36,14 @@ sql:
       go:
         package: sqlcgen
         out: modules/catalog/internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+  - engine: postgresql
+    schema: [internal/platform/db/sqlc/schemas.sql, modules/subscription/db/migrations]
+    queries: modules/subscription/db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: modules/subscription/internal/adapter/postgres/sqlcgen
         sql_package: pgx/v5
         emit_pointers_for_null_types: true

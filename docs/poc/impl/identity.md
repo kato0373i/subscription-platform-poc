@@ -42,7 +42,7 @@
 | 009 | ✅ | `e2e/tests/catalog/authorization.spec.ts`（viewer のプランの PATCH が 403、プランは変わらない） |
 | 010 | 一部 ✅ | admin の C2・C4 の 403 は `console-authz.spec.ts`、catalog.write の成功は `e2e/tests/catalog/authorization.spec.ts`。webhook-endpoints の 403 は integration の実装後 |
 | 011・013・015・016・020 | ✅ | `console-staff.spec.ts`・`console-authz.spec.ts`・`console-api-keys.spec.ts` |
-| 019 | ✅（暫定） | `console-api-keys.spec.ts`。`/v1/tenant/*` は subscription の実装前なので console のルートで確かめる（P-IMP-11）。subscription の実装後に `GET /v1/tenant/subscriptions` に置き換える |
+| 019 | ✅ | `e2e/tests/subscription/tenant-subscriptions.spec.ts`（失効したキーで `GET /v1/tenant/subscriptions` が 401、別のキーは 200）。console のルートでの確認（`console-api-keys.spec.ts`）も残す |
 | 021・023〜025 | ✅ | `me-account.spec.ts` |
 | 022・026〜028・030〜032 | ✅ | `modules/customer/internal/app/integration_test.go`（031 は退会の API が orchestration なので、結合テストで確かめている） |
 | 029 | 一部 ✅ | `Withdraw` のマスキング・`customer.withdrawn`（tenant_id = null）・リンクが残ることは結合テスト。`DELETE /v1/me` の E2E（`me-withdraw.spec.ts`）は orchestration の実装後 |

@@ -271,11 +271,11 @@ func TestLateConfirm(t *testing.T) {
 
 	f.clock.Advance(24*time.Hour + time.Minute)
 	stats, err := f.svc.SweepJob().Run(ctx, schedulerRun())
-	if err != nil || stats["released"] != 2 {
+	if err != nil || stats["released"] != int64(2) {
 		t.Fatalf("sweep: %v %v", stats, err)
 	}
 	// 2 回目は何もしない（二重に枠を戻さない）
-	if stats, _ := f.svc.SweepJob().Run(ctx, schedulerRun()); stats["released"] != 0 {
+	if stats, _ := f.svc.SweepJob().Run(ctx, schedulerRun()); stats["released"] != int64(0) {
 		t.Errorf("2 回目: %v", stats)
 	}
 	if f.redeemed(t, free.ID) != 0 || f.redeemed(t, full.ID) != 0 {

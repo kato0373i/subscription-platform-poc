@@ -552,3 +552,4 @@ Subscription → Billing の依存を作らないため、無効化は非同期�
 | 2026-10-13 | P-TST-8 を反映。E2E 列に、シナリオ（`e2e/tests/scenarios/` の E2E-xxx）かドメインの API テスト（`e2e/tests/subscription/*.spec.ts`、ファイル名は案）かを明記し、「追加」の表記を spec ファイル名に置き換え | TL-Subscription（Claude） |
 | 2026-10-13 | P-TST-9 を反映。時刻を進める API テストを `.clock.spec.ts` に分けた（015 → `cancellation.clock.spec.ts`、037 → `trial-will-end.clock.spec.ts`、040 → `renewal-day-reservation.clock.spec.ts`。029 は `cancellation.spec.ts` に残す）。凡例の `[clock]` の説明を規約に置き換え | TL-Subscription（Claude） |
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
+| 2026-10-24 | 実装時の決定を反映（P-IMP-14）：トライアル終了の予告ジョブの名前を `subscription-trial-will-end` に、ID の型は sharedkernel のもの、consumer_self は Platform の `enable_customer_rls` を使う。実装の状況は `docs/poc/impl/subscription.md` | PdM |

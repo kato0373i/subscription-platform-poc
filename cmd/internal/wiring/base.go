@@ -38,6 +38,7 @@ type Base struct {
 	Topology  messaging.Topology
 	Schedules scheduler.Schedules
 	Clock     sk.Clock
+	Services  Services // modules() が組み立てた contracts（devtools の一括シードが使う）
 }
 
 // NewBase は設定・ログ・DB・AWS・配線を用意する。

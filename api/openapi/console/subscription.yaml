@@ -1,0 +1,70 @@
+# 事業者コンソールの契約の照会（subscription.md §7）。主体は staff、ヘッダー X-Tenant-Id 必須。参照のみ。
+openapi: 3.0.3
+info: {title: console-subscription, version: "1"}
+paths:
+  /v1/console/subscriptions:
+    get:
+      operationId: consoleListSubscriptions
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant after the membership check (RLS)
+      parameters:
+        - {name: status, in: query, style: form, explode: true, schema: {type: array, items: {$ref: '../me/subscription.yaml#/components/schemas/Status'}}}
+        - {name: plan_id, in: query, schema: {type: string, format: uuid}}
+        - {name: customer_id, in: query, schema: {type: string, pattern: '^cus_[0-9A-Za-z]{24}$'}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 契約の一覧（作成の新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Subscription'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/subscriptions/{subscription_id}:
+    get:
+      operationId: consoleGetSubscription
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {name: subscription_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: 契約（請求の履歴は billing の API）, content: {application/json: {schema: {$ref: '#/components/schemas/Subscription'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    Subscription:
+      type: object
+      required: [id, customer_id, product_id, plan_id, price_version_id, interval, quantity, status, entitled, current_period, next_renewal_date, trial,
+        scheduled_plan_change, scheduled_cancellation, renewal_in_progress, cancel_reason, canceled_at, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        customer_id: {type: string, description: 事業者ごとの契約者 ID（cus_…）}
+        product_id: {type: string, format: uuid}
+        plan_id: {type: string, format: uuid}
+        price_version_id: {type: string, format: uuid}
+        interval: {type: string, enum: [month, year]}
+        quantity: {type: integer}
+        status: {$ref: '../me/subscription.yaml#/components/schemas/Status'}
+        entitled: {type: boolean}
+        current_period: {$ref: '../me/subscription.yaml#/components/schemas/Period'}
+        next_renewal_date: {type: string, format: date, nullable: true}
+        trial: {allOf: [{$ref: '../me/subscription.yaml#/components/schemas/Period'}], nullable: true}
+        scheduled_plan_change: {allOf: [{$ref: '../me/subscription.yaml#/components/schemas/ScheduledPlanChange'}], nullable: true}
+        scheduled_cancellation: {allOf: [{$ref: '../me/subscription.yaml#/components/schemas/ScheduledCancellation'}], nullable: true}
+        renewal_in_progress: {type: boolean}
+        cancel_reason: {type: string, enum: [customer, dunning, tenant_suspended], nullable: true}
+        canceled_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        applied_discount:
+          type: object
+          nullable: true
+          description: console だけ返す（事業者 API では返さない）
+          required: [remaining_cycles]
+          properties:
+            remaining_cycles: {type: integer}

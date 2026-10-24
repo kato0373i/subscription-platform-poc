@@ -27,3 +27,13 @@ jobs:
     process: worker-billing
     schedule: "cron(5 * * * ? *)"
     dedupe: hourly
+  # トライアル終了の予告（subscription.md §8。毎日 09:00 JST）
+  - name: subscription-trial-will-end
+    process: worker-billing
+    schedule: "cron(0 9 * * ? *)"
+    dedupe: daily
+  # 一括シード（platform.md §7.3。devtools のみ。POST /v1/dev/seed/subscriptions が投入する）
+  - name: platform-dev-seed-subscriptions
+    process: worker-billing
+    dedupe: none
+    devtools: true

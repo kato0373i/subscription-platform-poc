@@ -9,20 +9,21 @@ import (
 	sk "subscription-platform/internal/sharedkernel"
 )
 
+// ID の型は sharedkernel のもの（subscription・billing と型を合わせる。P-IMP-14）。
 type (
-	ProductTag      struct{}
-	PlanTag         struct{}
-	PriceVersionTag struct{}
-	CouponTag       struct{}
-	RedemptionTag   struct{}
+	ProductTag      = sk.ProductTag
+	PlanTag         = sk.PlanTag
+	PriceVersionTag = sk.PriceVersionTag
+	CouponTag       = sk.CouponTag
+	RedemptionTag   = sk.RedemptionTag
 )
 
 type (
-	ProductID      = sk.ID[ProductTag]
-	PlanID         = sk.ID[PlanTag]
-	PriceVersionID = sk.ID[PriceVersionTag]
-	CouponID       = sk.ID[CouponTag]
-	RedemptionID   = sk.ID[RedemptionTag]
+	ProductID      = sk.ProductID
+	PlanID         = sk.PlanID
+	PriceVersionID = sk.PriceVersionID
+	CouponID       = sk.CouponID
+	RedemptionID   = sk.RedemptionID
 )
 
 // PlanStatus はプランの状態。

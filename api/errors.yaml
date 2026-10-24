@@ -146,3 +146,33 @@ codes:
     title: クーポンの利用上限に達しました
     owner: catalog
     description: 消費枠数（予約＋確定）が上限に達した
+  - code: subscription_terminal
+    status: 409
+    title: この契約は終了しています
+    owner: subscription
+    description: 解約済み・申込不成立の契約への操作
+  - code: subscription_state_conflict
+    status: 409
+    title: 現在の契約の状態ではこの操作はできません
+    owner: subscription
+    description: 申込処理中の解約予約、支払い遅延中のプラン変更など
+  - code: cancellation_scheduled
+    status: 409
+    title: 解約が予約されています
+    owner: subscription
+    description: 解約予約中のプラン変更（先に解約予約を取り消す）
+  - code: cancellation_not_revocable
+    status: 409
+    title: この解約予約は取り消せません
+    owner: subscription
+    description: 事業者の停止に伴う解約予約（D-01）
+  - code: plan_change_not_allowed
+    status: 422
+    title: このプランには変更できません
+    owner: subscription
+    description: errors[].code に different_product / plan_unavailable / same_plan
+  - code: trial_not_eligible
+    status: 422
+    title: このプランのトライアルは利用済みです
+    owner: subscription
+    description: 同じ商品のトライアルを使った契約者の申込（申込 API が返す。FR-014）

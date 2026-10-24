@@ -27,7 +27,7 @@ const (
 )
 
 // Stats はジョブの件数の記録（job_runs.stats）。
-type Stats map[string]int64
+type Stats map[string]any
 
 // Job はモジュールが実装するジョブ。冪等に書く。
 type Job interface {

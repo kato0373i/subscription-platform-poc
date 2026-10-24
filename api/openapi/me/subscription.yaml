@@ -1,0 +1,141 @@
+# 契約者のマイページの契約（subscription.md §7）。主体は consumer。事業者をまたいで自分の契約だけを返す（FR-018）。
+openapi: 3.0.3
+info: {title: me-subscription, version: "1"}
+paths:
+  /v1/me/subscriptions:
+    get:
+      operationId: meListSubscriptions
+      x-sp-isolation: not_applicable:lists only the caller's own subscriptions (consumer_self RLS)
+      parameters:
+        - {name: status, in: query, style: form, explode: true, schema: {type: array, items: {$ref: '#/components/schemas/Status'}}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 自分の契約の一覧（作成の新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/MeSubscription'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/me/subscriptions/{subscription_id}:
+    get:
+      operationId: meGetSubscription
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/SubscriptionIDPath'}
+      responses:
+        "200": {description: 契約, content: {application/json: {schema: {$ref: '#/components/schemas/MeSubscription'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/me/subscriptions/{subscription_id}/scheduled-plan-change:
+    put:
+      operationId: meSchedulePlanChange
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/SubscriptionIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [plan_id]
+              properties:
+                plan_id: {type: string, format: uuid}
+      responses:
+        "200": {description: 予約後の契約（scheduled_plan_change.effective_date を含む）, content: {application/json: {schema: {$ref: '#/components/schemas/MeSubscription'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+        "422": {$ref: '../common.yaml#/components/responses/Problem'}
+    delete:
+      operationId: meRevokePlanChange
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/SubscriptionIDPath'}
+      responses:
+        "200": {description: 取り消し後の契約（予約がなくても 200）, content: {application/json: {schema: {$ref: '#/components/schemas/MeSubscription'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/me/subscriptions/{subscription_id}/scheduled-cancellation:
+    put:
+      operationId: meScheduleCancellation
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/SubscriptionIDPath'}
+      requestBody:
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false}
+      responses:
+        "200": {description: 予約後の契約（scheduled_cancellation.effective_date を含む。支払い遅延中は即時に canceled）, content: {application/json: {schema: {$ref: '#/components/schemas/MeSubscription'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+    delete:
+      operationId: meRevokeCancellation
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/SubscriptionIDPath'}
+      responses:
+        "200": {description: 取り消し後の契約, content: {application/json: {schema: {$ref: '#/components/schemas/MeSubscription'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    SubscriptionIDPath: {name: subscription_id, in: path, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    Status: {type: string, enum: [pending_initial, trialing, active, past_due, canceled, signup_failed]}
+    Period:
+      type: object
+      required: [start, end]
+      properties:
+        start: {type: string, format: date}
+        end: {type: string, format: date}
+    ScheduledPlanChange:
+      type: object
+      required: [plan_id, effective_date]
+      properties:
+        plan_id: {type: string, format: uuid}
+        effective_date: {type: string, format: date}
+    ScheduledCancellation:
+      type: object
+      required: [effective_date, revocable, source]
+      properties:
+        effective_date: {type: string, format: date}
+        revocable: {type: boolean}
+        source: {type: string, enum: [customer, system]}
+    MeSubscription:
+      type: object
+      required: [id, tenant_id, product_id, plan_id, price_version_id, interval, quantity, status, entitled, current_period, next_renewal_date, trial,
+        scheduled_plan_change, scheduled_cancellation, renewal_in_progress, cancel_reason, canceled_at, created_at, payment_method_id, applied_discount]
+      properties:
+        id: {type: string, format: uuid}
+        tenant_id: {type: string, format: uuid}
+        product_id: {type: string, format: uuid}
+        plan_id: {type: string, format: uuid}
+        price_version_id: {type: string, format: uuid}
+        interval: {type: string, enum: [month, year]}
+        quantity: {type: integer}
+        status: {$ref: '#/components/schemas/Status'}
+        entitled: {type: boolean}
+        current_period: {$ref: '#/components/schemas/Period'}
+        next_renewal_date: {type: string, format: date, nullable: true}
+        trial: {allOf: [{$ref: '#/components/schemas/Period'}], nullable: true}
+        scheduled_plan_change: {allOf: [{$ref: '#/components/schemas/ScheduledPlanChange'}], nullable: true}
+        scheduled_cancellation: {allOf: [{$ref: '#/components/schemas/ScheduledCancellation'}], nullable: true}
+        renewal_in_progress: {type: boolean}
+        cancel_reason: {type: string, enum: [customer, dunning, tenant_suspended], nullable: true}
+        canceled_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        payment_method_id: {type: string, format: uuid}
+        applied_discount:
+          type: object
+          nullable: true
+          required: [remaining_cycles]
+          properties:
+            remaining_cycles: {type: integer}

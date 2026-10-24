@@ -260,7 +260,7 @@ func TestPlatformGCJobs(t *testing.T) {
 	)
 	for _, j := range scheduler.PlatformJobs(d.Pool, []string{"billing"}) {
 		st, err := j.Run(context.Background(), scheduler.Run{})
-		if err != nil || st["deleted"] > 1 {
+		if err != nil || st["deleted"].(int64) > 1 {
 			t.Fatalf("%s: %v %v", j.Name(), st, err)
 		}
 	}

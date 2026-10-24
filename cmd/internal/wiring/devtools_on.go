@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/ecdsa"
 
+	"subscription-platform/cmd/internal/wiring/devseed"
 	"subscription-platform/internal/platform/db"
 	"subscription-platform/internal/platform/devapi"
 	"subscription-platform/internal/platform/devclock"
@@ -21,7 +22,15 @@ import (
 func newClock(pool *db.Pool) sk.Clock { return devclock.New(pool) }
 
 func registerDev(r *httpx.Router, b *Base, key *ecdsa.PrivateKey) error {
-	return devapi.Register(r, devapi.Deps{Pool: b.Pool, Clock: b.Clock.(*devclock.Clock), Scheduler: b.SchedulerService(), DevKey: key})
+	if err := devapi.Register(r, devapi.Deps{Pool: b.Pool, Clock: b.Clock.(*devclock.Clock), Scheduler: b.SchedulerService(), DevKey: key}); err != nil {
+		return err
+	}
+	return devseed.Register(r, seedDeps(b))
+}
+
+func seedDeps(b *Base) devseed.Deps {
+	s := b.Services
+	return devseed.Deps{Customer: s.Customer, Catalog: s.Catalog, Subscription: s.Subscription, Clock: b.Clock, Scheduler: b.SchedulerService()}
 }
 
 // platformParts は platform 自身の購読者とジョブ。
@@ -36,6 +45,7 @@ func platformParts(b *Base, process string, schemas []string) ([]messaging.Consu
 		})
 		js = append(js, scheduler.PlatformJobs(b.Pool, schemas)...)
 		js = append(js, noopJob{pool: b.Pool, writer: outbox.NewWriter("platform", b.Clock), clock: b.Clock})
+		js = append(js, devseed.Job(seedDeps(b)))
 	}
 	return cs, js
 }

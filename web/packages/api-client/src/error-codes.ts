@@ -29,7 +29,13 @@ export type ErrorCode =
   | "coupon_expired"
   | "coupon_not_applicable"
   | "coupon_already_used"
-  | "coupon_exhausted";
+  | "coupon_exhausted"
+  | "subscription_terminal"
+  | "subscription_state_conflict"
+  | "cancellation_scheduled"
+  | "cancellation_not_revocable"
+  | "plan_change_not_allowed"
+  | "trial_not_eligible";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -61,4 +67,10 @@ export const errorStatus: Record<ErrorCode, number> = {
   coupon_not_applicable: 422,
   coupon_already_used: 422,
   coupon_exhausted: 422,
+  subscription_terminal: 409,
+  subscription_state_conflict: 409,
+  cancellation_scheduled: 409,
+  cancellation_not_revocable: 409,
+  plan_change_not_allowed: 422,
+  trial_not_eligible: 422,
 };

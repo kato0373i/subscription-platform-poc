@@ -65,6 +65,18 @@ const (
 	CouponAlreadyUsed Code = "coupon_already_used"
 	// CouponExhausted は クーポンの利用上限に達しました（422、owner: catalog）。
 	CouponExhausted Code = "coupon_exhausted"
+	// SubscriptionTerminal は この契約は終了しています（409、owner: subscription）。
+	SubscriptionTerminal Code = "subscription_terminal"
+	// SubscriptionStateConflict は 現在の契約の状態ではこの操作はできません（409、owner: subscription）。
+	SubscriptionStateConflict Code = "subscription_state_conflict"
+	// CancellationScheduled は 解約が予約されています（409、owner: subscription）。
+	CancellationScheduled Code = "cancellation_scheduled"
+	// CancellationNotRevocable は この解約予約は取り消せません（409、owner: subscription）。
+	CancellationNotRevocable Code = "cancellation_not_revocable"
+	// PlanChangeNotAllowed は このプランには変更できません（422、owner: subscription）。
+	PlanChangeNotAllowed Code = "plan_change_not_allowed"
+	// TrialNotEligible は このプランのトライアルは利用済みです（422、owner: subscription）。
+	TrialNotEligible Code = "trial_not_eligible"
 )
 
 // Info はコードの HTTP ステータスと題名。
@@ -76,35 +88,41 @@ type Info struct {
 
 // All は全コードの情報。
 var All = map[Code]Info{
-	ValidationFailed:        {Status: 400, Title: "入力の形式が正しくありません", Owner: "platform"},
-	Unauthenticated:         {Status: 401, Title: "認証が必要です", Owner: "platform"},
-	Forbidden:               {Status: 403, Title: "この操作は許可されていません", Owner: "platform"},
-	NotFound:                {Status: 404, Title: "見つかりません", Owner: "platform"},
-	MethodNotAllowed:        {Status: 405, Title: "このメソッドは使えません", Owner: "platform"},
-	Conflict:                {Status: 409, Title: "ほかの更新と競合しました", Owner: "platform"},
-	RequestInProgress:       {Status: 409, Title: "同じリクエストを処理中です", Owner: "platform"},
-	IdempotencyKeyReused:    {Status: 422, Title: "Idempotency-Key が別の内容で使われています", Owner: "platform"},
-	InternalError:           {Status: 500, Title: "内部エラーが発生しました", Owner: "platform"},
-	ServiceUnavailable:      {Status: 503, Title: "一時的に利用できません", Owner: "platform"},
-	ProviderUnavailable:     {Status: 503, Title: "決済代行が一時的に利用できません", Owner: "payments"},
-	ClockBackwardNotAllowed: {Status: 422, Title: "業務時刻は戻せません", Owner: "platform"},
-	TenantNotActive:         {Status: 403, Title: "事業者が有効ではありません", Owner: "tenant"},
-	TenantStateConflict:     {Status: 409, Title: "事業者の状態がこの操作を許しません", Owner: "tenant"},
-	FincodeShopIdTaken:      {Status: 409, Title: "この fincode のショップ ID は使用されています", Owner: "tenant"},
-	StaffAlreadyExists:      {Status: 409, Title: "このスタッフは登録済みです", Owner: "tenant"},
-	LastOwnerRequired:       {Status: 409, Title: "オーナーを 0 名にすることはできません", Owner: "tenant"},
-	ApiKeyLimitExceeded:     {Status: 409, Title: "有効な API キーの上限に達しています", Owner: "tenant"},
-	AccountWithdrawn:        {Status: 403, Title: "退会済みのアカウントです", Owner: "customer"},
-	EmailUnverified:         {Status: 403, Title: "メールアドレスが確認されていません", Owner: "customer"},
-	EmailAlreadyRegistered:  {Status: 409, Title: "このメールアドレスは別のアカウントで登録済みです", Owner: "customer"},
-	PlanUnavailable:         {Status: 410, Title: "現在お申し込みいただけません", Owner: "catalog"},
-	PriceUnchanged:          {Status: 422, Title: "現在の価格と同じです", Owner: "catalog"},
-	CouponCodeTaken:         {Status: 409, Title: "このクーポンコードは使用されています", Owner: "catalog"},
-	CouponNotFound:          {Status: 422, Title: "クーポンが見つかりません", Owner: "catalog"},
-	CouponExpired:           {Status: 422, Title: "クーポンの有効期限が切れています", Owner: "catalog"},
-	CouponNotApplicable:     {Status: 422, Title: "このプランには使えないクーポンです", Owner: "catalog"},
-	CouponAlreadyUsed:       {Status: 422, Title: "このクーポンは使用済みです", Owner: "catalog"},
-	CouponExhausted:         {Status: 422, Title: "クーポンの利用上限に達しました", Owner: "catalog"},
+	ValidationFailed:          {Status: 400, Title: "入力の形式が正しくありません", Owner: "platform"},
+	Unauthenticated:           {Status: 401, Title: "認証が必要です", Owner: "platform"},
+	Forbidden:                 {Status: 403, Title: "この操作は許可されていません", Owner: "platform"},
+	NotFound:                  {Status: 404, Title: "見つかりません", Owner: "platform"},
+	MethodNotAllowed:          {Status: 405, Title: "このメソッドは使えません", Owner: "platform"},
+	Conflict:                  {Status: 409, Title: "ほかの更新と競合しました", Owner: "platform"},
+	RequestInProgress:         {Status: 409, Title: "同じリクエストを処理中です", Owner: "platform"},
+	IdempotencyKeyReused:      {Status: 422, Title: "Idempotency-Key が別の内容で使われています", Owner: "platform"},
+	InternalError:             {Status: 500, Title: "内部エラーが発生しました", Owner: "platform"},
+	ServiceUnavailable:        {Status: 503, Title: "一時的に利用できません", Owner: "platform"},
+	ProviderUnavailable:       {Status: 503, Title: "決済代行が一時的に利用できません", Owner: "payments"},
+	ClockBackwardNotAllowed:   {Status: 422, Title: "業務時刻は戻せません", Owner: "platform"},
+	TenantNotActive:           {Status: 403, Title: "事業者が有効ではありません", Owner: "tenant"},
+	TenantStateConflict:       {Status: 409, Title: "事業者の状態がこの操作を許しません", Owner: "tenant"},
+	FincodeShopIdTaken:        {Status: 409, Title: "この fincode のショップ ID は使用されています", Owner: "tenant"},
+	StaffAlreadyExists:        {Status: 409, Title: "このスタッフは登録済みです", Owner: "tenant"},
+	LastOwnerRequired:         {Status: 409, Title: "オーナーを 0 名にすることはできません", Owner: "tenant"},
+	ApiKeyLimitExceeded:       {Status: 409, Title: "有効な API キーの上限に達しています", Owner: "tenant"},
+	AccountWithdrawn:          {Status: 403, Title: "退会済みのアカウントです", Owner: "customer"},
+	EmailUnverified:           {Status: 403, Title: "メールアドレスが確認されていません", Owner: "customer"},
+	EmailAlreadyRegistered:    {Status: 409, Title: "このメールアドレスは別のアカウントで登録済みです", Owner: "customer"},
+	PlanUnavailable:           {Status: 410, Title: "現在お申し込みいただけません", Owner: "catalog"},
+	PriceUnchanged:            {Status: 422, Title: "現在の価格と同じです", Owner: "catalog"},
+	CouponCodeTaken:           {Status: 409, Title: "このクーポンコードは使用されています", Owner: "catalog"},
+	CouponNotFound:            {Status: 422, Title: "クーポンが見つかりません", Owner: "catalog"},
+	CouponExpired:             {Status: 422, Title: "クーポンの有効期限が切れています", Owner: "catalog"},
+	CouponNotApplicable:       {Status: 422, Title: "このプランには使えないクーポンです", Owner: "catalog"},
+	CouponAlreadyUsed:         {Status: 422, Title: "このクーポンは使用済みです", Owner: "catalog"},
+	CouponExhausted:           {Status: 422, Title: "クーポンの利用上限に達しました", Owner: "catalog"},
+	SubscriptionTerminal:      {Status: 409, Title: "この契約は終了しています", Owner: "subscription"},
+	SubscriptionStateConflict: {Status: 409, Title: "現在の契約の状態ではこの操作はできません", Owner: "subscription"},
+	CancellationScheduled:     {Status: 409, Title: "解約が予約されています", Owner: "subscription"},
+	CancellationNotRevocable:  {Status: 409, Title: "この解約予約は取り消せません", Owner: "subscription"},
+	PlanChangeNotAllowed:      {Status: 422, Title: "このプランには変更できません", Owner: "subscription"},
+	TrialNotEligible:          {Status: 422, Title: "このプランのトライアルは利用済みです", Owner: "subscription"},
 }
 
 // Status はコードの HTTP ステータス（未登録なら 500）。

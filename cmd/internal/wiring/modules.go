@@ -11,7 +11,11 @@ import (
 	"subscription-platform/internal/platform/scheduler"
 	sk "subscription-platform/internal/sharedkernel"
 	"subscription-platform/modules/catalog"
+	catalogcontracts "subscription-platform/modules/catalog/contracts"
 	"subscription-platform/modules/customer"
+	customercontracts "subscription-platform/modules/customer/contracts"
+	"subscription-platform/modules/subscription"
+	subscriptioncontracts "subscription-platform/modules/subscription/contracts"
 	"subscription-platform/modules/tenant"
 	tenantcontracts "subscription-platform/modules/tenant/contracts"
 )
@@ -27,6 +31,14 @@ type ModuleSet struct {
 	Ports      func(*httpx.Ports) // httpx に注入する関数（identity・audit）
 }
 
+// Services は組み立てたモジュールの contracts。
+type Services struct {
+	Tenant       tenantcontracts.Service
+	Customer     customercontracts.Service
+	Catalog      catalogcontracts.Service
+	Subscription subscriptioncontracts.Service
+}
+
 // modules はプロセスに組み込むモジュール。マイグレーションの順序（tenant → … → audit）で並べる。
 func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 	codec, err := httpx.NewCursorCodec(b.Cfg.CursorKey)
@@ -36,10 +48,13 @@ func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 	t := tenant.New(tenant.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec})
 	c := customer.New(customer.Deps{Pool: b.Pool, Clock: b.Clock})
 	cat := catalog.New(catalog.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Tenants: t.Service(), ReservationTTL: b.Cfg.CatalogCouponReservationTTL})
+	sub := subscription.New(subscription.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Catalog: cat.Service()})
+	b.Services = Services{Tenant: t.Service(), Customer: c.Service(), Catalog: cat.Service(), Subscription: sub.Service()}
 	return []ModuleSet{
 		{Name: tenant.Name, HasOutbox: true, MountHTTP: t.MountHTTP, Ports: tenantPorts(t.Service())},
 		{Name: customer.Name, HasOutbox: true, MountHTTP: c.MountHTTP, Ports: func(p *httpx.Ports) { p.ResolveConsumer = c.ResolveConsumer }},
 		{Name: catalog.Name, HasOutbox: true, MountHTTP: cat.MountHTTP, Jobs: cat.Jobs()},
+		{Name: subscription.Name, HasOutbox: true, MountHTTP: sub.MountHTTP, Jobs: sub.Jobs()},
 	}, nil
 }
 
