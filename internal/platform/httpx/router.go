@@ -422,6 +422,15 @@ func (r *Router) wrap(pol *routePolicy, h http.Handler) http.Handler {
 		}
 		kind, needsAuth := pol.audience.principalKind()
 		if !needsAuth {
+			// 申込ページの公開 API は認証が任意。consumer のトークンがあれば検証して主体を置く（不正なトークンは 401。catalog.md §7.5）
+			if pol.audience == AudienceCheckout && bearer(req) != "" {
+				ctx, p, err := r.authenticate(req, KindConsumer)
+				if err != nil {
+					WriteProblem(w, req, err)
+					return
+				}
+				req = req.WithContext(r.annotateContext(ctx, p))
+			}
 			r.afterAuth(pol, h, w, req)
 			return
 		}

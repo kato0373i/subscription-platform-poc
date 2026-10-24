@@ -35,19 +35,19 @@
 
 | AC | 状況 | 確かめている場所 |
 |---|---|---|
-| 001 | ✅（監査記録は ⏳ audit） | `ops-tenants.spec.ts`。`tenant.register` の注釈は書いている |
+| 001 | ✅（監査記録は ⏳ audit） | `ops-tenants.spec.ts`。`tenant.create` の注釈は書いている |
 | 002〜004・006 | ✅ | `ops-tenants.spec.ts`、`modules/tenant/internal/app/integration_test.go` |
 | 005・008・037 | ✅ | `modules/tenant/internal/domain/domain_test.go`、`modules/tenant/contracts/contracts_test.go` |
 | 007・012・014・017・018・034 | ✅ | `modules/tenant/internal/app/integration_test.go` |
-| 009 | ⏳ catalog | viewer の書き込みの 403 は `console-authz.spec.ts`（API キーの発行）で確かめている |
-| 010 | 一部 ✅ | admin の C2・C4 の 403 は `console-authz.spec.ts`。webhook-endpoints の 403・catalog.write の成功は integration・catalog の実装後 |
+| 009 | ✅ | `e2e/tests/catalog/authorization.spec.ts`（viewer のプランの PATCH が 403、プランは変わらない） |
+| 010 | 一部 ✅ | admin の C2・C4 の 403 は `console-authz.spec.ts`、catalog.write の成功は `e2e/tests/catalog/authorization.spec.ts`。webhook-endpoints の 403 は integration の実装後 |
 | 011・013・015・016・020 | ✅ | `console-staff.spec.ts`・`console-authz.spec.ts`・`console-api-keys.spec.ts` |
 | 019 | ✅（暫定） | `console-api-keys.spec.ts`。`/v1/tenant/*` は subscription の実装前なので console のルートで確かめる（P-IMP-11）。subscription の実装後に `GET /v1/tenant/subscriptions` に置き換える |
 | 021・023〜025 | ✅ | `me-account.spec.ts` |
 | 022・026〜028・030〜032 | ✅ | `modules/customer/internal/app/integration_test.go`（031 は退会の API が orchestration なので、結合テストで確かめている） |
 | 029 | 一部 ✅ | `Withdraw` のマスキング・`customer.withdrawn`（tenant_id = null）・リンクが残ることは結合テスト。`DELETE /v1/me` の E2E（`me-withdraw.spec.ts`）は orchestration の実装後 |
 | 033 | ⏳ orchestration | E2E-018 |
-| 035・036 | ✅（監査記録は ⏳ audit） | `console-staff.spec.ts`・`console-api-keys.spec.ts`。`staff.change_role`・`api_key.issue` の注釈は書いている（キー名は P-IMP-8） |
+| 035・036 | ✅（監査記録は ⏳ audit） | `console-staff.spec.ts`・`console-api-keys.spec.ts`。`staff.update_role`・`api_key.create` の注釈は書いている（キー名は P-IMP-8） |
 
 Platform の AC で identity を待っていたもの（`docs/poc/impl/platform.md` も更新済み）：AC-PLT-027 は ✅。AC-PLT-025 は tenant_api の入口（`/v1/tenant/*`）が subscription の実装後、AC-PLT-067 は契約一覧が subscription の実装後。
 

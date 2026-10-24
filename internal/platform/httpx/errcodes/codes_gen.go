@@ -49,6 +49,22 @@ const (
 	EmailUnverified Code = "email_unverified"
 	// EmailAlreadyRegistered は このメールアドレスは別のアカウントで登録済みです（409、owner: customer）。
 	EmailAlreadyRegistered Code = "email_already_registered"
+	// PlanUnavailable は 現在お申し込みいただけません（410、owner: catalog）。
+	PlanUnavailable Code = "plan_unavailable"
+	// PriceUnchanged は 現在の価格と同じです（422、owner: catalog）。
+	PriceUnchanged Code = "price_unchanged"
+	// CouponCodeTaken は このクーポンコードは使用されています（409、owner: catalog）。
+	CouponCodeTaken Code = "coupon_code_taken"
+	// CouponNotFound は クーポンが見つかりません（422、owner: catalog）。
+	CouponNotFound Code = "coupon_not_found"
+	// CouponExpired は クーポンの有効期限が切れています（422、owner: catalog）。
+	CouponExpired Code = "coupon_expired"
+	// CouponNotApplicable は このプランには使えないクーポンです（422、owner: catalog）。
+	CouponNotApplicable Code = "coupon_not_applicable"
+	// CouponAlreadyUsed は このクーポンは使用済みです（422、owner: catalog）。
+	CouponAlreadyUsed Code = "coupon_already_used"
+	// CouponExhausted は クーポンの利用上限に達しました（422、owner: catalog）。
+	CouponExhausted Code = "coupon_exhausted"
 )
 
 // Info はコードの HTTP ステータスと題名。
@@ -81,6 +97,14 @@ var All = map[Code]Info{
 	AccountWithdrawn:        {Status: 403, Title: "退会済みのアカウントです", Owner: "customer"},
 	EmailUnverified:         {Status: 403, Title: "メールアドレスが確認されていません", Owner: "customer"},
 	EmailAlreadyRegistered:  {Status: 409, Title: "このメールアドレスは別のアカウントで登録済みです", Owner: "customer"},
+	PlanUnavailable:         {Status: 410, Title: "現在お申し込みいただけません", Owner: "catalog"},
+	PriceUnchanged:          {Status: 422, Title: "現在の価格と同じです", Owner: "catalog"},
+	CouponCodeTaken:         {Status: 409, Title: "このクーポンコードは使用されています", Owner: "catalog"},
+	CouponNotFound:          {Status: 422, Title: "クーポンが見つかりません", Owner: "catalog"},
+	CouponExpired:           {Status: 422, Title: "クーポンの有効期限が切れています", Owner: "catalog"},
+	CouponNotApplicable:     {Status: 422, Title: "このプランには使えないクーポンです", Owner: "catalog"},
+	CouponAlreadyUsed:       {Status: 422, Title: "このクーポンは使用済みです", Owner: "catalog"},
+	CouponExhausted:         {Status: 422, Title: "クーポンの利用上限に達しました", Owner: "catalog"},
 }
 
 // Status はコードの HTTP ステータス（未登録なら 500）。

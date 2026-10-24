@@ -22,3 +22,8 @@ jobs:
     process: worker-billing
     dedupe: daily
     devtools: true
+  # 放置されたクーポンの予約の解放（catalog.md §8）
+  - name: catalog-coupon-reservation-sweep
+    process: worker-billing
+    schedule: "cron(5 * * * ? *)"
+    dedupe: hourly

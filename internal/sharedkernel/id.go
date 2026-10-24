@@ -78,6 +78,10 @@ type TenantID = ID[TenantTag]
 type CustomerAccountTag struct{}
 type CustomerAccountID = ID[CustomerAccountTag]
 
+// SubscriptionID はモジュールをまたいで渡す契約の ID（catalog のクーポンの予約、billing の請求など）。
+type SubscriptionTag struct{}
+type SubscriptionID = ID[SubscriptionTag]
+
 type EventTag struct{}
 type EventID = ID[EventTag]
 

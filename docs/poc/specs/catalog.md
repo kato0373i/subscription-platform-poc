@@ -236,7 +236,7 @@ type Service interface {
 | `PlanDetail` | `PlanSnapshot` を埋め込み ＋ Status string（draft/published/unpublished）, Published bool |
 | `Quote` | Amount `Money`, TaxRate `TaxRate`（将来 Lines を追加） |
 | `UsageInput` | 空の struct（将来の項目は追加のみ。§10） |
-| `CouponReservation` | RedemptionID, CouponID, Discount |
+| `CouponReservation` | RedemptionID, CouponID, Discount, DurationCycles（P-IMP-12） |
 | `Discount` | `sharedkernel.Discount` をそのまま使う（P-CAT-5）。割引額は `Discount.Apply(amount)` で算出する（D-10 の式は sharedkernel の 1 か所だけ） |
 
 - `TenantID`・`CustomerAccountID` は sharedkernel のもの（ベースライン §5.1）。`PlanID` などカタログ固有の ID は contracts で `sharedkernel.ID[T]` の別名として定義する。
@@ -351,7 +351,7 @@ CREATE TABLE catalog.coupon_redemptions (
 | `price_versions (plan_id, version_no DESC)` | 最新版の取得（UNIQUE で兼ねる） |
 
 **RLS**
-- 上の全テーブルと `outbox_events` に `ENABLE` と `FORCE ROW LEVEL SECURITY` をかける。
+- 上の全テーブルに `ENABLE` と `FORCE ROW LEVEL SECURITY` をかける（`outbox_events` は Platform の定義に従い RLS をかけない。P-IMP-12）。
 - ポリシー：`USING (tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid)`、`WITH CHECK` も同じ。未設定なら 0 件になる。
 - テナントをまたぐ読み取りは、次の `SECURITY DEFINER` 関数だけに限定する（返すのは ID だけ。中身は改めて RLS 下で読む）。
 
@@ -364,7 +364,7 @@ CREATE TABLE catalog.coupon_redemptions (
 
 ## 7. API
 
-共通：エラーは Problem Details。一覧は `limit`（既定 20、上限 100）・`starting_after`、レスポンスは `{data, has_more, next_cursor}`。金額は JPY の整数（税込）。税率は sharedkernel の JSON 表現（例 `"10/100"`）。console の POST は Idempotency-Key 不要（ベースラインの必須対象外）。
+共通：エラーは Problem Details。一覧は `limit`（既定 20、上限 100）・`starting_after`、レスポンスは `{data, has_more, next_cursor}`。金額は JPY の整数（税込）。税率は小数 3 桁の文字列（例 `"0.100"`。P-IMP-12）。console の POST は Idempotency-Key 不要（ベースラインの必須対象外）。
 
 ### 7.1 認可（console）
 
@@ -398,7 +398,7 @@ CREATE TABLE catalog.coupon_redemptions (
 | `PATCH /v1/console/plans/{id}` | name?, description?, trial_days?（interval・scheme・amount は不可→`validation_failed`） | 200 Plan | `validation_failed`, `not_found` |
 | `POST /v1/console/plans/{id}/price-versions` | amount | 201 PriceVersion{id, version_no, amount, tax_rate, effective_from} | `validation_failed`, `price_unchanged` 422, `not_found` |
 | `GET /v1/console/plans/{id}/price-versions` | limit, starting_after（version_no 降順） | 200 一覧 | `not_found` |
-| `POST /v1/console/plans/{id}/publish` | なし | 200 Plan | `tenant_not_active` 409（detail「審査完了後に公開できます」）, `not_found` |
+| `POST /v1/console/plans/{id}/publish` | なし | 200 Plan | `tenant_not_active` 403（detail「審査完了後に公開できます」。P-IMP-12）, `not_found` |
 | `POST /v1/console/plans/{id}/unpublish` | なし | 200 Plan | `conflict` 409（draft のとき）, `not_found` |
 
 - publish / unpublish / price-versions は、すでに目的の状態なら 200 で現状を返す（冪等）。価格改定の二重送信は `price_unchanged` で弾かれる。
@@ -566,10 +566,10 @@ RETURNING redeemed_count;
 
 | ID | 要件 | レベル | Given / When / Then | 確かめる場所 |
 |---|---|---|---|---|
-| AC-CAT-001 | FR-003 | e2e | Given active な事業者の admin / When `POST /v1/console/plans` で 980 円・month・trial 14 日のプランを作成 / Then 201、status=draft、current_price は v1（980 円・10/100）。DB の Outbox に `catalog.price_version_added` がある | `catalog/plans.spec.ts` |
+| AC-CAT-001 | FR-003 | e2e | Given active な事業者の admin / When `POST /v1/console/plans` で 980 円・month・trial 14 日のプランを作成 / Then 201、status=draft、current_price は v1（980 円・税率 "0.100"）。DB の Outbox に `catalog.price_version_added` がある | `catalog/plans.spec.ts` |
 | AC-CAT-002 | FR-003, D-08 | unit | Given プランの生成関数・価格版の追加 / When 金額が 0・−1・1,000,001 / Then 範囲外のエラー。1 と 1,000,000 は成功する | —（Go のテスト） |
 | AC-CAT-003 | FR-003 | e2e | Given 別の事業者の商品 ID / When その商品でプランを作成 / Then 404 `not_found` | `catalog/plans.spec.ts` |
-| AC-CAT-004 | FR-001 | e2e | Given 事業者が pending_review / When publish / Then 409 `tenant_not_active`、GET で status は draft のまま | `catalog/plans.spec.ts` |
+| AC-CAT-004 | FR-001 | e2e | Given 事業者が pending_review / When publish / Then 403 `tenant_not_active`（P-IMP-12）、GET で status は draft のまま | `catalog/plans.spec.ts` |
 | AC-CAT-005 | FR-004 | unit | Given 各状態のプラン / When Publish・Unpublish / Then §3.2 の状態遷移表どおり（冪等な操作はイベントを記録しない、draft の unpublish はエラー） | —（Go のテスト） |
 | AC-CAT-006 | FR-004 | e2e | Given 980 円（v1）の公開プラン / When 1,280 円に改定 / Then 201 で v2。`GET /v1/checkout/plans/{id}` は 1,280 円・v2 の price_version_id を返し、price-versions の一覧に v1（980 円）が残る | `catalog/plans.spec.ts` |
 | AC-CAT-007 | FR-004 | e2e | Given 現在 980 円 / When 980 円で改定 / Then 422 `price_unchanged`、版は増えない | `catalog/plans.spec.ts` |
@@ -624,3 +624,4 @@ RETURNING redeemed_count;
 | 2026-10-13 | テスト方針の変更（P-TST-1〜7）を反映。§11 にテストのレベルの定義を追加し、AC-CAT のレベルを unit / integration（本物の DB）/ e2e（Playwright）に付け直した。console API・公開 API の条件を e2e に移し、API と DB で確かめる形に書き直した（AC-CAT-001・006・009・019・024・025・027・032・033）。API でのテナント分離を AC-CAT-034 として追加。`TenantStatusReader` ポートをやめ、本物の tenant モジュールを組み立てる形にした。ステータスを Review に変更 | TL-Catalog（Claude） |
 | 2026-10-13 | P-TST-8 を反映。§11 の受け入れ条件に「確かめる場所」の列を追加し、e2e の条件ごとにシナリオの番号（E2E-003・017）か `e2e/tests/catalog/` の spec ファイル名の案を書いた。spec ファイルの一覧を追加 | TL-Catalog（Claude） |
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
+| 2026-10-24 | 実装時の決定を反映（P-IMP-12・13）：税率の表現を `"0.100"` に、publish の `tenant_not_active` を 403 に、`CouponReservation` に DurationCycles を追加、`outbox_events` の RLS の記述を Platform に合わせた。実装の状況は `docs/poc/impl/catalog.md` | PdM |

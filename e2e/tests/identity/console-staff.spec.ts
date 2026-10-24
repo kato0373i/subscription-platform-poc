@@ -36,7 +36,7 @@ test("AC-IDN-035: owner が admin を viewer に変える。同じロールの�
   const again = await api.call<Staff>("PATCH", `/v1/console/staff/${target.id}`, { token: tenant.ownerToken, tenantId: tenant.id, body: { role: "viewer" } });
   expect(again.status).toBe(200);
   expect(await db.count("SELECT count(*) FROM tenant.outbox_events WHERE tenant_id = $1 AND event_type <> 'tenant.approved'", [tenant.id])).toBe(0);
-  // 監査記録（staff.change_role、email・subject を含まない）の確認は audit モジュールの実装後（docs/poc/impl/identity.md）
+  // 監査記録（staff.update_role、email・subject を含まない）の確認は audit モジュールの実装後（docs/poc/impl/identity.md）
 
   const bad = await api.call("PATCH", `/v1/console/staff/${target.id}`, { token: tenant.ownerToken, tenantId: tenant.id, body: { role: "operator" } });
   expect(bad.status).toBe(400);

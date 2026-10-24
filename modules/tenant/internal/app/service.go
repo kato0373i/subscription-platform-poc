@@ -55,7 +55,7 @@ func (s *Service) RegisterTenant(ctx context.Context, name string) (domain.Tenan
 		return domain.TenantState{}, err
 	}
 	st := t.State()
-	auditctx.Annotate(ctx, "tenant.register", tenantTarget(st.ID), nil, map[string]any{"tenant_name": st.Name}, auditctx.WithTenant(st.ID))
+	auditctx.Annotate(ctx, "tenant.create", tenantTarget(st.ID), nil, map[string]any{"tenant_name": st.Name}, auditctx.WithTenant(st.ID))
 	return st, nil
 }
 
@@ -200,7 +200,7 @@ func (s *Service) CreateStaff(ctx context.Context, tenantID sk.TenantID, subject
 	if err != nil {
 		return domain.StaffState{}, err
 	}
-	auditctx.Annotate(ctx, "staff.add", auditctx.Target{Type: "staff", ID: st.ID.String()}, nil,
+	auditctx.Annotate(ctx, "staff.create", auditctx.Target{Type: "staff", ID: st.ID.String()}, nil,
 		map[string]any{"staff_id": st.ID.String(), "role": string(st.Role)}, auditctx.WithTenant(tenantID))
 	return st, nil
 }
@@ -263,7 +263,7 @@ func (s *Service) ChangeStaffRole(ctx context.Context, tenantID sk.TenantID, sta
 		return domain.StaffState{}, err
 	}
 	if changed {
-		auditctx.Annotate(ctx, "staff.change_role", auditctx.Target{Type: "staff", ID: staffID.String()},
+		auditctx.Annotate(ctx, "staff.update_role", auditctx.Target{Type: "staff", ID: staffID.String()},
 			map[string]any{"role": string(before)}, map[string]any{"role": string(st.Role)})
 	}
 	return st, nil
@@ -294,7 +294,7 @@ func (s *Service) RemoveStaff(ctx context.Context, tenantID sk.TenantID, staffID
 	if err != nil {
 		return err
 	}
-	auditctx.Annotate(ctx, "staff.remove", auditctx.Target{Type: "staff", ID: staffID.String()},
+	auditctx.Annotate(ctx, "staff.delete", auditctx.Target{Type: "staff", ID: staffID.String()},
 		map[string]any{"staff_id": staffID.String(), "role": string(removed.Role)}, nil)
 	return nil
 }
@@ -333,7 +333,7 @@ func (s *Service) IssueAPIKey(ctx context.Context, tenantID sk.TenantID, name, a
 		return IssuedKey{}, err
 	}
 	st := out.State
-	auditctx.Annotate(ctx, "api_key.issue", auditctx.Target{Type: "api_key", ID: st.ID.String()}, nil,
+	auditctx.Annotate(ctx, "api_key.create", auditctx.Target{Type: "api_key", ID: st.ID.String()}, nil,
 		map[string]any{"api_key_id": st.ID.String(), "key_prefix": st.Prefix, "key_name": st.Name})
 	return out, nil
 }

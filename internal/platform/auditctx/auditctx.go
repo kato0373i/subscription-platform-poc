@@ -92,7 +92,9 @@ var maskedKeys = []string{"secret", "token", "password", "email", "name"}
 
 func masked(k string) bool {
 	k = strings.ToLower(k)
-	if k == "tenant_name" || k == "key_name" || k == "display_name_changed" {
+	switch k {
+	case "tenant_name", "key_name", "product_name", "plan_name", "coupon_name", "display_name_changed":
+		// 事業者・商品・プラン・クーポン・キーの名前は個人情報ではない（P-IMP-8・P-IMP-12）
 		return false
 	}
 	for _, m := range maskedKeys {

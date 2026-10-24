@@ -21,7 +21,15 @@ export type ErrorCode =
   | "api_key_limit_exceeded"
   | "account_withdrawn"
   | "email_unverified"
-  | "email_already_registered";
+  | "email_already_registered"
+  | "plan_unavailable"
+  | "price_unchanged"
+  | "coupon_code_taken"
+  | "coupon_not_found"
+  | "coupon_expired"
+  | "coupon_not_applicable"
+  | "coupon_already_used"
+  | "coupon_exhausted";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -45,4 +53,12 @@ export const errorStatus: Record<ErrorCode, number> = {
   account_withdrawn: 403,
   email_unverified: 403,
   email_already_registered: 409,
+  plan_unavailable: 410,
+  price_unchanged: 422,
+  coupon_code_taken: 409,
+  coupon_not_found: 422,
+  coupon_expired: 422,
+  coupon_not_applicable: 422,
+  coupon_already_used: 422,
+  coupon_exhausted: 422,
 };

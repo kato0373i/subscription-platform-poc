@@ -10,6 +10,7 @@ import (
 	"subscription-platform/internal/platform/messaging"
 	"subscription-platform/internal/platform/scheduler"
 	sk "subscription-platform/internal/sharedkernel"
+	"subscription-platform/modules/catalog"
 	"subscription-platform/modules/customer"
 	"subscription-platform/modules/tenant"
 	tenantcontracts "subscription-platform/modules/tenant/contracts"
@@ -34,9 +35,11 @@ func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 	}
 	t := tenant.New(tenant.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec})
 	c := customer.New(customer.Deps{Pool: b.Pool, Clock: b.Clock})
+	cat := catalog.New(catalog.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Tenants: t.Service(), ReservationTTL: b.Cfg.CatalogCouponReservationTTL})
 	return []ModuleSet{
 		{Name: tenant.Name, HasOutbox: true, MountHTTP: t.MountHTTP, Ports: tenantPorts(t.Service())},
 		{Name: customer.Name, HasOutbox: true, MountHTTP: c.MountHTTP, Ports: func(p *httpx.Ports) { p.ResolveConsumer = c.ResolveConsumer }},
+		{Name: catalog.Name, HasOutbox: true, MountHTTP: cat.MountHTTP, Jobs: cat.Jobs()},
 	}, nil
 }
 

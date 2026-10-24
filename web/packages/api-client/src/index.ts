@@ -3,6 +3,8 @@ export type { paths as DevPaths, components as DevComponents } from "./gen/dev.t
 export type { paths as OpsTenantPaths, components as OpsTenantComponents } from "./gen/ops-tenant.ts";
 export type { paths as ConsoleTenantPaths, components as ConsoleTenantComponents } from "./gen/console-tenant.ts";
 export type { paths as MeCustomerPaths, components as MeCustomerComponents } from "./gen/me-customer.ts";
+export type { paths as ConsoleCatalogPaths, components as ConsoleCatalogComponents } from "./gen/console-catalog.ts";
+export type { paths as CheckoutCatalogPaths, components as CheckoutCatalogComponents } from "./gen/checkout-catalog.ts";
 export type { ErrorCode } from "./error-codes.ts";
 export { errorStatus } from "./error-codes.ts";
 

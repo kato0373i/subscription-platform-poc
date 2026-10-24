@@ -25,6 +25,8 @@ func TestRulesDetectViolations(t *testing.T) {
 		m + "/internal/platform/httpx":            {m + "/modules/tenant/contracts"},
 		m + "/modules/subscription/contracts":     {m + "/modules/catalog/contracts"},
 		m + "/modules/orchestration/internal/app": {m + "/modules/billing/contracts", m + "/modules/payments/contracts"},
+		m + "/modules/catalog/internal/app_test":  {m + "/modules/tenant"},
+		m + "/modules/tenant/internal/app_test":   {m + "/modules/catalog"},
 	}
 	got := archtest.Check(graph)
 	var lines []string
@@ -39,13 +41,14 @@ func TestRulesDetectViolations(t *testing.T) {
 		"devseed may import only modules/*/contracts",
 		"platform must not import modules",
 		"contracts must not import other modules",
+		m + "/modules/tenant/internal/app_test → " + m + "/modules/catalog: tenant → catalog is not on the context map",
 	} {
 		if !strings.Contains(joined, want) {
 			t.Errorf("検出されなかった: %s\n---\n%s", want, joined)
 		}
 	}
 	for _, v := range got {
-		if strings.Contains(v.From, "orchestration") || v.From == m+"/cmd/internal/wiring" {
+		if strings.Contains(v.From, "orchestration") || v.From == m+"/cmd/internal/wiring" || v.From == m+"/modules/catalog/internal/app_test" {
 			t.Errorf("許可されている依存を違反とした: %s", v)
 		}
 	}

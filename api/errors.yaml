@@ -106,3 +106,43 @@ codes:
     title: このメールアドレスは別のアカウントで登録済みです
     owner: customer
     description: 初回ログインで、email が他の有効なアカウントと重複（自動で紐づけない）
+  - code: plan_unavailable
+    status: 410
+    title: 現在お申し込みいただけません
+    owner: catalog
+    description: プランが非公開、または事業者が有効でない（申込 API では 422 で返す。catalog.md §4）
+  - code: price_unchanged
+    status: 422
+    title: 現在の価格と同じです
+    owner: catalog
+    description: 価格改定の金額が現在の価格と同じ（二重送信の防止）
+  - code: coupon_code_taken
+    status: 409
+    title: このクーポンコードは使用されています
+    owner: catalog
+    description: 同じ事業者に同じコード（大文字に正規化）がある
+  - code: coupon_not_found
+    status: 422
+    title: クーポンが見つかりません
+    owner: catalog
+    description: コードがない、または無効化されている
+  - code: coupon_expired
+    status: 422
+    title: クーポンの有効期限が切れています
+    owner: catalog
+    description: now >= expires_at
+  - code: coupon_not_applicable
+    status: 422
+    title: このプランには使えないクーポンです
+    owner: catalog
+    description: 対象プランの指定に含まれない
+  - code: coupon_already_used
+    status: 422
+    title: このクーポンは使用済みです
+    owner: catalog
+    description: 同じ契約者が予約中・確定済み（1 人 1 回）
+  - code: coupon_exhausted
+    status: 422
+    title: クーポンの利用上限に達しました
+    owner: catalog
+    description: 消費枠数（予約＋確定）が上限に達した

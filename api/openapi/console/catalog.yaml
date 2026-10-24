@@ -1,0 +1,361 @@
+# 事業者コンソールの商品・プラン・価格・クーポン（catalog.md §7.1〜§7.4）。主体は staff、ヘッダー X-Tenant-Id 必須。
+openapi: 3.0.3
+info: {title: console-catalog, version: "1"}
+paths:
+  /v1/console/products:
+    post:
+      operationId: consoleCreateProduct
+      x-sp-permission: catalog.write
+      x-sp-isolation: not_applicable:creates a product in the X-Tenant-Id tenant only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {type: string}
+                description: {type: string}
+      responses:
+        "201": {description: 作成した商品, content: {application/json: {schema: {$ref: '#/components/schemas/Product'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: consoleListProducts
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant after the membership check (RLS)
+      parameters:
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 商品の一覧（作成順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Product'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/products/{product_id}:
+    get:
+      operationId: consoleGetProduct
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/ProductIDPath'}
+      responses:
+        "200": {description: 商品, content: {application/json: {schema: {$ref: '#/components/schemas/Product'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+    patch:
+      operationId: consoleUpdateProduct
+      x-sp-permission: catalog.write
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/ProductIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                name: {type: string}
+                description: {type: string}
+      responses:
+        "200": {description: 更新後の商品, content: {application/json: {schema: {$ref: '#/components/schemas/Product'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/plans:
+    post:
+      operationId: consoleCreatePlan
+      x-sp-permission: catalog.write
+      x-sp-isolation: not_applicable:creates a plan in the X-Tenant-Id tenant only (another tenant's product is 404, AC-CAT-003)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [product_id, name, billing_interval, trial_days, amount]
+              properties:
+                product_id: {type: string, format: uuid}
+                name: {type: string}
+                description: {type: string}
+                billing_interval: {type: string, enum: [month, year]}
+                trial_days: {type: integer}
+                pricing_scheme: {type: string, enum: [fixed]}
+                amount: {type: integer, format: int64}
+      responses:
+        "201": {description: 作成したプラン（draft、v1）, content: {application/json: {schema: {$ref: '#/components/schemas/Plan'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: consoleListPlans
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant after the membership check (RLS)
+      parameters:
+        - {name: product_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/PlanStatus'}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: プランの一覧（作成順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Plan'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/plans/{plan_id}:
+    get:
+      operationId: consoleGetPlan
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+      responses:
+        "200": {description: プラン, content: {application/json: {schema: {$ref: '#/components/schemas/Plan'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+    patch:
+      operationId: consoleUpdatePlan
+      x-sp-permission: catalog.write
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              description: billing_interval・pricing_scheme・amount は変更できない（価格は price-versions で改定する）
+              properties:
+                name: {type: string}
+                description: {type: string}
+                trial_days: {type: integer}
+      responses:
+        "200": {description: 更新後のプラン, content: {application/json: {schema: {$ref: '#/components/schemas/Plan'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/plans/{plan_id}/price-versions:
+    post:
+      operationId: consoleAddPriceVersion
+      x-sp-permission: catalog.write
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [amount]
+              properties:
+                amount: {type: integer, format: int64}
+      responses:
+        "201": {description: 追加した価格版（即時適用）, content: {application/json: {schema: {$ref: '#/components/schemas/PriceVersion'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "422": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: consoleListPriceVersions
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 価格版の一覧（version_no の降順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/PriceVersion'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/plans/{plan_id}/publish:
+    post:
+      operationId: consolePublishPlan
+      x-sp-permission: catalog.write
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+      responses:
+        "200": {description: 公開後のプラン（公開済みなら現状）, content: {application/json: {schema: {$ref: '#/components/schemas/Plan'}}}}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/plans/{plan_id}/unpublish:
+    post:
+      operationId: consoleUnpublishPlan
+      x-sp-permission: catalog.write
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+      responses:
+        "200": {description: 非公開後のプラン（非公開なら現状）, content: {application/json: {schema: {$ref: '#/components/schemas/Plan'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/coupons:
+    post:
+      operationId: consoleCreateCoupon
+      x-sp-permission: coupon.write
+      x-sp-isolation: not_applicable:creates a coupon in the X-Tenant-Id tenant only (another tenant's plan_ids are 404)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [code, name, discount, applies_to]
+              properties:
+                code: {type: string}
+                name: {type: string}
+                discount: {$ref: '#/components/schemas/Discount'}
+                applies_to: {type: string, enum: [all_plans, selected_plans]}
+                plan_ids: {type: array, items: {type: string, format: uuid}}
+                expires_at: {type: string, format: date-time}
+                max_redemptions: {type: integer}
+      responses:
+        "201": {description: 作成したクーポン, content: {application/json: {schema: {$ref: '#/components/schemas/Coupon'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: consoleListCoupons
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant after the membership check (RLS)
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [active, inactive]}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: クーポンの一覧（作成順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Coupon'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/coupons/{coupon_id}:
+    get:
+      operationId: consoleGetCoupon
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/CouponIDPath'}
+      responses:
+        "200": {description: クーポン, content: {application/json: {schema: {$ref: '#/components/schemas/Coupon'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+    patch:
+      operationId: consoleUpdateCoupon
+      x-sp-permission: coupon.write
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/CouponIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              description: 割引条件は変更できない。status は inactive への変更だけ（戻せない）
+              properties:
+                name: {type: string}
+                status: {type: string, enum: [inactive]}
+      responses:
+        "200": {description: 更新後のクーポン, content: {application/json: {schema: {$ref: '#/components/schemas/Coupon'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    ProductIDPath: {name: product_id, in: path, required: true, schema: {type: string, format: uuid}}
+    PlanIDPath: {name: plan_id, in: path, required: true, schema: {type: string, format: uuid}}
+    CouponIDPath: {name: coupon_id, in: path, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    Product:
+      type: object
+      required: [id, name, description, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: string}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    PlanStatus: {type: string, enum: [draft, published, unpublished]}
+    PriceVersion:
+      type: object
+      required: [price_version_id, version_no, amount, tax_rate, effective_from]
+      properties:
+        price_version_id: {type: string, format: uuid}
+        version_no: {type: integer}
+        amount: {type: integer, format: int64, description: 税込の円}
+        tax_rate: {type: string, description: '小数 3 桁（例 "0.100"）'}
+        effective_from: {type: string, format: date-time}
+    Plan:
+      type: object
+      required: [id, product_id, name, description, billing_interval, trial_days, pricing_scheme, status, current_price, published_at, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        product_id: {type: string, format: uuid}
+        name: {type: string}
+        description: {type: string}
+        billing_interval: {type: string, enum: [month, year]}
+        trial_days: {type: integer}
+        pricing_scheme: {type: string, enum: [fixed]}
+        status: {$ref: '#/components/schemas/PlanStatus'}
+        current_price: {$ref: '#/components/schemas/PriceVersion'}
+        published_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    Discount:
+      type: object
+      additionalProperties: false
+      required: [type, value, duration_cycles]
+      properties:
+        type: {type: string, enum: [amount, percent]}
+        value: {type: integer, format: int64, description: amount は円、percent は 1〜100}
+        duration_cycles: {type: integer, description: 割引を適用する課金の回数（1〜24）}
+    Coupon:
+      type: object
+      required: [id, code, name, discount, applies_to, plan_ids, expires_at, max_redemptions, redeemed_count, status, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        code: {type: string}
+        name: {type: string}
+        discount: {$ref: '#/components/schemas/Discount'}
+        applies_to: {type: string, enum: [all_plans, selected_plans]}
+        plan_ids: {type: array, items: {type: string, format: uuid}}
+        expires_at: {type: string, format: date-time, nullable: true}
+        max_redemptions: {type: integer, nullable: true}
+        redeemed_count: {type: integer}
+        status: {type: string, enum: [active, inactive]}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}

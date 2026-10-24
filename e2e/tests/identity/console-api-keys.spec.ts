@@ -22,7 +22,7 @@ test("AC-IDN-016: 平文は発行の応答に 1 回だけ。一覧に無く、DB
   expect(await db.count("SELECT count(*) FROM tenant.api_keys k WHERE position($1 in (k.*)::text) > 0", [raw])).toBe(0);
   const rows = await db.query<{ key_hash: Buffer }>("SELECT key_hash FROM tenant.api_keys WHERE id = $1", [res.body.id]);
   expect(rows[0]!.key_hash.toString("hex")).toBe(createHash("sha256").update(raw).digest("hex"));
-  // 監査記録 api_key.issue（key_prefix・key_name があり、平文・hash が無い。AC-IDN-036）の確認は audit モジュールの実装後
+  // 監査記録 api_key.create（key_prefix・key_name があり、平文・hash が無い。AC-IDN-036）の確認は audit モジュールの実装後
 });
 
 test("AC-IDN-019: 失効したキーは 401。失効前に発行した別のキーは使える（ローテーション）", { tag: "@isolation:consoleRevokeApiKey" }, async ({ api, world }) => {

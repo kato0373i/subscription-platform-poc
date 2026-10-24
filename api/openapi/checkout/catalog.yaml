@@ -1,0 +1,76 @@
+# 申込ページ用の公開 API（catalog.md §7.5）。認証なし。クーポンのプレビューは consumer のトークンがあれば使用済みも判定する（任意の認証）。
+openapi: 3.0.3
+info: {title: checkout-catalog, version: "1"}
+paths:
+  /v1/checkout/plans/{plan_id}:
+    get:
+      operationId: checkoutGetPlan
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+      responses:
+        "200":
+          description: 申込できるプラン（Cache-Control public, max-age=60）
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CheckoutPlan'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "410": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/checkout/plans/{plan_id}/coupons/{code}:
+    get:
+      operationId: checkoutPreviewCoupon
+      parameters:
+        - {$ref: '#/components/parameters/PlanIDPath'}
+        - {name: code, in: path, required: true, schema: {type: string, maxLength: 64}}
+      responses:
+        "200":
+          description: クーポンの内容と割引の参考値（確定額は請求で決まる）
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/CouponPreview'}
+        "401": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "410": {$ref: '../common.yaml#/components/responses/Problem'}
+        "422": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    PlanIDPath: {name: plan_id, in: path, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    CheckoutPlan:
+      type: object
+      required: [plan_id, product, name, description, billing_interval, trial_days, amount, tax_rate, price_version_id]
+      properties:
+        plan_id: {type: string, format: uuid}
+        product:
+          type: object
+          required: [id, name]
+          properties:
+            id: {type: string, format: uuid}
+            name: {type: string}
+        name: {type: string}
+        description: {type: string}
+        billing_interval: {type: string, enum: [month, year]}
+        trial_days: {type: integer}
+        amount: {type: integer, format: int64, description: 税込の円}
+        tax_rate: {type: string}
+        price_version_id: {type: string, format: uuid}
+    CouponPreview:
+      type: object
+      required: [code, discount, preview]
+      properties:
+        code: {type: string}
+        discount:
+          type: object
+          required: [type, value, duration_cycles]
+          properties:
+            type: {type: string, enum: [amount, percent]}
+            value: {type: integer, format: int64}
+            duration_cycles: {type: integer}
+        preview:
+          type: object
+          required: [list_amount, discount_amount, first_amount, discounted_cycles, applies_from]
+          properties:
+            list_amount: {type: integer, format: int64}
+            discount_amount: {type: integer, format: int64}
+            first_amount: {type: integer, format: int64}
+            discounted_cycles: {type: integer}
+            applies_from: {type: string, enum: [first_charge]}

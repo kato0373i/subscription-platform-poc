@@ -63,6 +63,12 @@ func Check(graph map[string][]string) []Violation {
 				if !strings.HasPrefix(toRest, "contracts") {
 					out = append(out, Violation{from, to, "devseed may import only modules/*/contracts"})
 				}
+			case fromIsModule && fromMod != toMod && strings.HasSuffix(from, "_test") && (toRest == "" || toRest == "db"):
+				// 結合テスト（外部テストパッケージ *_test）は、依存先の本物のモジュール（ルートとマイグレーション）を組み立ててよい
+				// （P-TST-2・P-IMP-12）。依存先はコンテキストマップの矢印にあるものに限る
+				if !contains(Allowed[fromMod], toMod) {
+					out = append(out, Violation{from, to, fmt.Sprintf("%s → %s is not on the context map", fromMod, toMod)})
+				}
 			case toRest == "":
 				// モジュールのルート（module.go）を import できるのは cmd/** だけ
 				if !isWiring && (!fromIsModule || fromMod != toMod) {
