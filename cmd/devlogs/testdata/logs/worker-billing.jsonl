@@ -1,0 +1,3 @@
+{"ts":"2026-10-24T03:00:00.300Z","level":"WARN","msg":"event.failed","service":"worker-billing","correlation_id":"C1","event_type":"subscription.started","error":{"code":"conflict","message":"version mismatch"}}
+{"ts":"2026-10-24T03:00:00.350Z","level":"INFO","msg":"domain.state_changed","service":"worker-billing","correlation_id":"C1","aggregate":"subscription","id":"S1","from":"pending_initial","to":"active"}
+{"ts":"2026-10-24T03:05:00.000Z","level":"INFO","msg":"job.completed","service":"worker-billing","correlation_id":"job:x:1","job":"platform-noop"}

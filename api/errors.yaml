@@ -1,0 +1,68 @@
+# エラーコードの正本（platform.md §7.2）。各 TL は自分の spec のコードをここに追記し、`task generate` で定数を生成する。
+# code は snake_case、status は 4xx/5xx、owner はモジュール名。
+codes:
+  - code: validation_failed
+    status: 400
+    title: 入力の形式が正しくありません
+    owner: platform
+    description: OpenAPI の検証、ページング、必須ヘッダーの不足
+  - code: unauthenticated
+    status: 401
+    title: 認証が必要です
+    owner: platform
+    description: トークン・API キーがない、不正、期限切れ
+  - code: forbidden
+    status: 403
+    title: この操作は許可されていません
+    owner: platform
+    description: 主体の種類・ロールが合わない、テナントに所属していない
+  - code: not_found
+    status: 404
+    title: 見つかりません
+    owner: platform
+    description: リソースがない、別テナントのリソース、未定義のルート
+  - code: method_not_allowed
+    status: 405
+    title: このメソッドは使えません
+    owner: platform
+    description: ServeMux の 405 を Problem に変換したもの
+  - code: conflict
+    status: 409
+    title: ほかの更新と競合しました
+    owner: platform
+    description: 楽観ロックの衝突
+  - code: request_in_progress
+    status: 409
+    title: 同じリクエストを処理中です
+    owner: platform
+    description: 同じ Idempotency-Key のリクエストを処理している
+  - code: idempotency_key_reused
+    status: 422
+    title: Idempotency-Key が別の内容で使われています
+    owner: platform
+    description: 同じキーで中身が違うリクエスト
+  - code: internal_error
+    status: 500
+    title: 内部エラーが発生しました
+    owner: platform
+    description: 想定外のエラー
+  - code: service_unavailable
+    status: 503
+    title: 一時的に利用できません
+    owner: platform
+    description: DB に接続できない、シャットダウン中
+  - code: provider_unavailable
+    status: 503
+    title: 決済代行が一時的に利用できません
+    owner: payments
+    description: 決済代行の障害（サーキットブレーカーが開いている）。Retry-After を付ける（P-PAY-4）
+  - code: clock_backward_not_allowed
+    status: 422
+    title: 業務時刻は戻せません
+    owner: platform
+    description: dev clock を現在より前にしようとした（devtools のみ）
+  - code: tenant_not_active
+    status: 403
+    title: 事業者が有効ではありません
+    owner: tenant
+    description: 停止中の事業者のスタッフによる書き込み、販売できない事業者への操作

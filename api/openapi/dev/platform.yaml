@@ -1,0 +1,136 @@
+# devtools ビルドだけに含まれる開発用 API（platform.md §7.3）。認証なし。本番のビルドには含めない。
+openapi: 3.0.3
+info: {title: dev-platform, version: "1"}
+paths:
+  /v1/dev/clock:
+    get:
+      operationId: getDevClock
+      responses:
+        "200": {description: 現在の業務時刻, content: {application/json: {schema: {$ref: '#/components/schemas/ClockState'}}}}
+    post:
+      operationId: setDevClock
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                advance: {type: string, description: 'Go の duration（例 "72h"）'}
+                to: {type: string, format: date-time}
+      responses:
+        "200": {description: 変更後の業務時刻, content: {application/json: {schema: {$ref: '#/components/schemas/ClockState'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "422": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/dev/jobs/{job}/run:
+    post:
+      operationId: runDevJob
+      parameters:
+        - {name: job, in: path, required: true, schema: {type: string, pattern: '^[a-z]+(-[a-z0-9]+)+$'}}
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                as_of: {type: string, format: date}
+                params: {type: object}
+                force: {type: boolean}
+                wait_seconds: {type: integer, minimum: 0, maximum: 300}
+      responses:
+        "200": {description: 完了, content: {application/json: {schema: {$ref: '#/components/schemas/JobRun'}}}}
+        "202": {description: 待ち時間切れ, content: {application/json: {schema: {$ref: '#/components/schemas/JobRun'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/dev/job-runs/{run_id}:
+    get:
+      operationId: getDevJobRun
+      parameters:
+        - {name: run_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: run, content: {application/json: {schema: {$ref: '#/components/schemas/JobRun'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/dev/tokens:
+    post:
+      operationId: issueDevToken
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [pool, sub]
+              properties:
+                pool: {type: string, enum: [consumer, staff, operator]}
+                sub: {type: string, minLength: 1, maxLength: 200}
+                email: {type: string}
+                email_verified: {type: boolean}
+                name: {type: string}
+                groups: {type: array, items: {type: string}}
+                ttl_seconds: {type: integer, minimum: 1, maximum: 86400}
+      responses:
+        "200":
+          description: 発行した開発用 JWT
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expires_at]
+                properties:
+                  token: {type: string}
+                  expires_at: {type: string, format: date-time}
+  /v1/dev/smoke:
+    post:
+      operationId: requestDevSmoke
+      description: 配線の確認用イベント platform.smoke_requested を Outbox に書く
+      responses:
+        "202":
+          description: 書いたイベント
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event_id]
+                properties:
+                  event_id: {type: string, format: uuid}
+  /v1/dev/smoke/{event_id}:
+    get:
+      operationId: getDevSmoke
+      parameters:
+        - {name: event_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: 配送の状況
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [published, consumed]
+                properties:
+                  published: {type: boolean}
+                  consumed: {type: boolean}
+components:
+  schemas:
+    ClockState:
+      type: object
+      required: [now, today, offset_seconds, version]
+      properties:
+        now: {type: string, format: date-time}
+        today: {type: string, format: date}
+        offset_seconds: {type: integer}
+        version: {type: integer}
+        effective_after: {type: string, format: date-time}
+    JobRun:
+      type: object
+      required: [run_id, status]
+      properties:
+        run_id: {type: string, format: uuid}
+        job: {type: string}
+        status: {type: string, enum: [queued, running, succeeded, failed]}
+        as_of: {type: string, format: date}
+        attempts: {type: integer}
+        stats: {type: object, nullable: true}
+        error: {type: string, nullable: true}
+        deduplicated: {type: boolean}

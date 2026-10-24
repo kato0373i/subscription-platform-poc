@@ -1,0 +1,102 @@
+# ローカル開発・CI の環境（platform.md §8.4）。
+#   task up            # MiniStack・webhook-sink・Fluent Bit を起動し、Terraform で RDS・キュー・バスを作る
+#   task dev           # 3 プロセスを go run -tags devtools で起動する
+#   task dev:container # 3 プロセスをコンテナで起動する（profile app。CI と同じ）
+name: sp
+
+x-app: &app
+  build:
+    context: .
+    args: {TAGS: devtools}
+  image: sp-app:devtools
+  profiles: [app]
+  env_file: [.env.container]
+  volumes:
+    - ./.local/logs:/app/.local/logs
+    - ./deploy/local:/app/deploy/local:ro
+  depends_on:
+    ministack: {condition: service_healthy}
+
+services:
+  ministack:
+    image: ministackorg/ministack:1.5.32
+    ports: ["4566:4566"]
+    environment:
+      DOCKER_NETWORK: sp_default   # RDS の PostgreSQL コンテナをこのネットワークに参加させる
+      RDS_PERSIST: "1"
+      PERSIST_STATE: "1"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4566/_ministack/health')"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  webhook-sink:
+    build: {context: ./tools/webhook-sink}
+    image: sp-webhook-sink:local
+    ports: ["18080:8080"]
+
+  # Fluent Bit の cloudwatch_logs 出力は TLS を強制するので、TLS を終端して MiniStack に渡す（ローカル専用）
+  ministack-tls:
+    image: nginx:1.29-alpine
+    volumes:
+      - ./deploy/local/ministack-tls.conf:/etc/nginx/nginx.conf:ro
+      - ./deploy/local/tls:/etc/nginx/tls:ro
+    depends_on:
+      ministack: {condition: service_healthy}
+
+  fluent-bit:
+    image: fluent/fluent-bit:5.1.3
+    command: ["/fluent-bit/bin/fluent-bit", "-c", "/fluent-bit/etc/sp.conf"]
+    environment:
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      AWS_REGION: ap-northeast-1
+    volumes:
+      - ./.local/logs:/logs:ro
+      - ./deploy/local/fluent-bit.conf:/fluent-bit/etc/sp.conf:ro
+      - fluent-bit-db:/fluent-bit/db
+    depends_on:
+      ministack-tls: {condition: service_started}
+
+  api:
+    <<: *app
+    entrypoint: ["/usr/local/bin/api"]
+    environment: {SERVICE_NAME: api}
+    ports: ["8080:8080"]
+
+  worker-billing:
+    <<: *app
+    entrypoint: ["/usr/local/bin/worker-billing"]
+    environment: {SERVICE_NAME: worker-billing, HEALTH_ADDR: ":8081"}
+    ports: ["8081:8081"]
+
+  worker-integration:
+    <<: *app
+    entrypoint: ["/usr/local/bin/worker-integration"]
+    environment: {SERVICE_NAME: worker-integration, HEALTH_ADDR: ":8082"}
+    ports: ["8082:8082"]
+
+  mailhog:
+    image: mailhog/mailhog:v1.0.1
+    profiles: [mail]
+    ports: ["8025:8025"]
+
+  # DB_MODE=container のフォールバック（MiniStack の RDS が使えないとき）
+  postgres:
+    image: postgres:16-alpine@sha256:f4610795587492cd4fb887c2dc3de301b813278bb6f616992061141b5f15ac36
+    profiles: [db]
+    environment:
+      POSTGRES_USER: spmaster
+      POSTGRES_PASSWORD: spmasterpw
+      POSTGRES_DB: sp
+    ports: ["15432:5432"]
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "spmaster", "-d", "sp"]
+      interval: 2s
+      retries: 30
+
+volumes:
+  fluent-bit-db:

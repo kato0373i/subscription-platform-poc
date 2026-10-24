@@ -1,0 +1,3 @@
+module webhook-sink
+
+go 1.26

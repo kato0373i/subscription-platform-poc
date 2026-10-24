@@ -1,0 +1,140 @@
+# タスク（platform.md §8.4・§8.6.5）。task がなければ `go tool task <名前>` で同じものを動かせる。
+version: "3"
+
+dotenv: [".env.local"]
+
+vars:
+  GOLANGCI_IMAGE: golangci/golangci-lint:v2.14.0
+
+tasks:
+  default:
+    cmds: [go tool task --list]
+
+  # ---- ローカル環境 ----
+  up:
+    desc: MiniStack・webhook-sink・Fluent Bit を起動し、Terraform で RDS・キュー等を作り、マイグレーションまで流す
+    cmds:
+      - mkdir -p .local/logs .local/bin
+      - docker compose up -d --wait ministack webhook-sink
+      - '{{if eq .DB_MODE "container"}}docker compose --profile db up -d --wait postgres{{else}}true{{end}}'
+      - ./scripts/tf.sh init -input=false -upgrade=false
+      - ./scripts/tf.sh apply -input=false -auto-approve -var rds_enabled={{if eq .DB_MODE "container"}}false{{else}}true{{end}} -var scheduler_enabled={{if eq .SCHEDULER_MODE "internal"}}false{{else}}true{{end}}
+      - ./scripts/local-env.sh
+      - task: migrate
+      - go build -o .local/bin/devlogs ./cmd/devlogs
+      - docker compose up -d fluent-bit
+    vars:
+      DB_MODE: '{{.DB_MODE | default "rds"}}'
+      SCHEDULER_MODE: '{{.SCHEDULER_MODE | default "internal"}}'
+
+  migrate:
+    desc: bootstrap（ロール）と up（devtools のマイグレーションを含む）
+    cmds:
+      - ./scripts/with-env.sh go run -tags devtools ./cmd/migrate bootstrap
+      - ./scripts/with-env.sh go run -tags devtools ./cmd/migrate up
+
+  dev:
+    desc: 3 プロセスを go run（devtools ビルド）で並行に起動する
+    cmds: [./scripts/dev.sh]
+
+  dev:container:
+    desc: 3 プロセスを compose の profile app で起動する（CI と同じ）
+    cmds:
+      - docker compose --profile app up -d --build --wait api worker-billing worker-integration
+      - ./scripts/wait-ready.sh
+
+  down:
+    desc: コンテナを止める（データは残す）
+    cmds:
+      - docker compose --profile app --profile db --profile mail down
+
+  reset:
+    desc: コンテナ・ボリューム・Terraform の state・ログを消してまっさらにする
+    cmds:
+      - docker compose --profile app --profile db --profile mail down -v --remove-orphans
+      - for c in $(docker ps -aq --filter "name=ministack-rds-"); do docker rm -f "$c"; done
+      - rm -rf infra/envs/local/terraform.tfstate* .env.local .env.container e2e/.env.e2e .local/logs
+
+  verify:local:
+    desc: テストイベントを 1 件発行し、購読者まで届くことを確かめる（3 プロセスが起動している前提）
+    cmds: [./scripts/verify-local.sh]
+
+  verify:ministack:
+    desc: MiniStack で使う機能（RDS の PostgreSQL 16・EventBridge の prefix・Scheduler・SES・CloudWatch Logs）を確かめる
+    cmds: [./scripts/verify-ministack.sh]
+
+  verify:fallback:
+    desc: フォールバック（MESSAGING_MODE=direct）でも smoke が通ることを確かめる。DB_MODE=container は task reset のあと DB_MODE=container task up
+    cmds: [./scripts/verify-fallback.sh]
+
+  dlq:redrive:
+    desc: DLQ のメッセージを元のキューに戻す（task dlq:redrive QUEUE=orc-collection）
+    requires: {vars: [QUEUE]}
+    cmds:
+      - aws --endpoint-url "$AWS_ENDPOINT_URL" sqs start-message-move-task --source-arn arn:aws:sqs:ap-northeast-1:000000000000:{{.QUEUE}}-dlq --destination-arn arn:aws:sqs:ap-northeast-1:000000000000:{{.QUEUE}}
+
+  # ---- 生成・lint・テスト ----
+  generate:
+    desc: コード生成（errcodes・TS の型）。生成物はコミットする
+    cmds:
+      - go run ./internal/tools/errcodesgen
+
+  lint:
+    desc: golangci-lint（depguard・forbidigo など）と E2E のファイル名の規約
+    cmds:
+      - |
+        if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run ./...
+        else docker run --rm -v "$PWD:/src" -w /src -v sp-golangci-cache:/root/.cache {{.GOLANGCI_IMAGE}} golangci-lint run ./...; fi
+      - go run ./internal/tools/e2elint
+
+  test:unit:
+    desc: UT（純粋なロジック）と静的検査（archtest）
+    cmds: [go test ./...]
+
+  test:integration:
+    desc: 結合テスト（testcontainers の PostgreSQL 16 と MiniStack）
+    cmds: [go test -tags integration -p 4 ./...]
+
+  e2e:
+    desc: Playwright の E2E（parallel → clock）。3 プロセスが起動している前提
+    dir: e2e
+    cmds: [npx -y pnpm@9 exec playwright test --project=parallel --project=clock]
+
+  e2e:selftest:
+    desc: わざと失敗するテストを流し、logs.jsonl・timeline.txt・errors.txt が添付されることを確かめる（AC-PLT-074）
+    dir: e2e
+    cmds: [node selftest/check.mjs]
+
+  e2e:reset:
+    desc: DB を作り直して migrate し直す
+    cmds:
+      - docker exec -i "$DB_CONTAINER" psql -q -U spmaster -d postgres -c "DROP DATABASE IF EXISTS sp WITH (FORCE)" -c "CREATE DATABASE sp"
+      - ./scripts/local-env.sh
+      - task: migrate
+
+  # ---- ログと調査（docs/runbooks/debugging.md） ----
+  logs:
+    desc: 相関 ID などで絞ったログを時系列に表示する（task logs -- --corr <ID>）
+    cmds:
+      - |
+        if [ -x .local/bin/devlogs ]; then .local/bin/devlogs {{.CLI_ARGS}}; else go run ./cmd/devlogs {{.CLI_ARGS}}; fi
+
+  logs:cwl:
+    desc: MiniStack の CloudWatch Logs に Logs Insights のクエリを流す（task logs:cwl -- '<クエリ>'）
+    cmds:
+      - |
+        if [ -x .local/bin/devlogs ]; then .local/bin/devlogs cwl {{.CLI_ARGS}}; else go run ./cmd/devlogs cwl {{.CLI_ARGS}}; fi
+
+  logs:clean:
+    desc: .local/logs を空にする（Fluent Bit の読み取り位置も消す）
+    cmds:
+      - rm -f .local/logs/*.jsonl .local/logs/*.jsonl.*
+      - docker compose rm -sf fluent-bit && docker volume rm -f sp_fluent-bit-db && docker compose up -d fluent-bit || true
+
+  db:reader:
+    desc: 読み取り専用の sp_e2e_reader で psql を開く
+    interactive: true
+    cmds:
+      - |
+        if command -v psql >/dev/null 2>&1; then psql "$E2E_READER_URL"
+        else docker exec -it "$DB_CONTAINER" psql "postgresql://sp_e2e_reader:sp_e2e_reader_local@localhost:5432/sp"; fi

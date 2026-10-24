@@ -1,0 +1,88 @@
+# 静的解析と依存ルール（platform.md §10.1）。depguard は前方一致なので、モジュールごとの許可リストは archtest が完全一致で検査する。
+version: "2"
+
+run:
+  build-tags: [integration, devtools]
+
+linters:
+  default: none
+  enable:
+    - depguard
+    - exhaustive
+    - errcheck
+    - errorlint
+    - gosec
+    - govet
+    - staticcheck
+    - bodyclose
+    - noctx
+    - sqlclosecheck
+    - sloglint
+    - forbidigo
+  settings:
+    exhaustive:
+      default-signifies-exhaustive: true
+    errcheck:
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - (io.Closer).Close
+        - (*os.File).Close
+        - (*database/sql.DB).Close
+        - (*github.com/jackc/pgx/v5.Conn).Close
+        - (*subscription-platform/internal/platform/observability.Logging).Close
+    sloglint:
+      context: all
+    gosec:
+      excludes: [G115] # 整数の変換は値域を確かめてから行う（gosec の誤検出が多い）
+    forbidigo:
+      analyze-types: true
+      forbid:
+        - pattern: '^time\.Now$'
+          msg: 業務時刻は注入された sharedkernel.Clock から取る（規約 M1）
+        - pattern: '^time\.(LoadLocation|Local)$'
+          msg: JST は sharedkernel.JST を使う（tzdata に依存しない）
+        - pattern: '^fmt\.Print(f|ln)?$'
+          msg: ログは observability のロガーを使う（§8.6.1）
+        - pattern: '^log\.(Print|Fatal|Panic)(f|ln)?$'
+          msg: ログは observability のロガーを使う（§8.6.1）
+        - pattern: '^http\.DefaultClient$'
+          msg: 外部への HTTP は observability.NewHTTPClient を使う（http.outbound.completed）
+    depguard:
+      rules:
+        auditctx:
+          files: ["**/internal/platform/auditctx/**", "!$test"]
+          allow: [$gostd, subscription-platform/internal/sharedkernel]
+        contracts:
+          files: ["**/modules/*/contracts/**", "!$test"]
+          allow: [$gostd, subscription-platform/internal/sharedkernel]
+        domain:
+          files: ["**/modules/*/internal/domain/**"]
+          allow: [$gostd, subscription-platform/internal/sharedkernel, subscription-platform/modules]
+          deny:
+            - {pkg: github.com/jackc/pgx, desc: ドメイン層は DB を知らない}
+            - {pkg: github.com/aws/aws-sdk-go-v2, desc: ドメイン層は AWS を知らない}
+            - {pkg: net/http, desc: ドメイン層は HTTP を知らない}
+            - {pkg: subscription-platform/internal/platform, desc: ドメイン層は platform に依存しない}
+        sharedkernel:
+          files: ["**/internal/sharedkernel/**", "!$test"]
+          allow: [$gostd, github.com/google/uuid]
+        platform:
+          files: ["**/internal/platform/**"]
+          deny:
+            - {pkg: subscription-platform/modules, desc: platform はドメインの知識を持たない（modules を import しない）}
+
+  exclusions:
+    generated: lax
+    rules:
+      # 業務時刻の規約（time.Now の禁止）は modules だけに効かせる
+      - path: '(internal/sharedkernel|internal/platform|internal/tools|cmd|tools)/'
+        linters: [forbidigo]
+        text: 'time\.Now'
+      - path: '_test\.go'
+        linters: [forbidigo, gosec, errcheck, noctx, bodyclose, sloglint]
+      # CLI とテスト用のツールは標準出力に書く
+      - path: '(cmd/devlogs|cmd/migrate|internal/tools|tools/webhook-sink)/'
+        linters: [forbidigo]
+        text: 'fmt\.Print|log\.'

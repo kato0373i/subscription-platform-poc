@@ -1,0 +1,26 @@
+# 配線の正本（platform.md §8.1）。Terraform（infra/modules/messaging）と Go（messaging.LoadTopology）の両方が読む。
+# 購読者ごとに 1 キュー。DLQ は "<name>-dlq" を自動で作る。events は detail-type の完全一致か "prefix:" だけ。
+# 各ドメインの TL は、モジュールを実装するときに自分のキューをここに追記する（購読者が登録されていないキューがあるとプロセスは起動しない）。
+bus: sp-events
+queues:
+  # 配線の確認用（task verify:local・tests/platform/smoke.spec.ts）。devtools の POST /v1/dev/smoke だけが発行する
+  - name: platform-smoke
+    process: worker-billing
+    consumer: platform.smoke
+    events: [platform.smoke_requested]
+    concurrency: 1
+    visibility_timeout_s: 30
+    max_receive: 3
+  # ジョブの起動（EventBridge Scheduler → プロセスごとの scheduler キュー。§8.3）
+  - name: scheduler-billing
+    process: worker-billing
+    kind: scheduler
+    concurrency: 2
+    visibility_timeout_s: 300
+    max_receive: 3
+  - name: scheduler-integration
+    process: worker-integration
+    kind: scheduler
+    concurrency: 2
+    visibility_timeout_s: 300
+    max_receive: 3
