@@ -1,0 +1,25 @@
+# 契約者自身のアカウント（identity.md §7.3）。主体は consumer。初回の呼び出しでアカウントを作る（JIT。認証のミドルウェアが行う）。
+# DELETE /v1/me（退会）は Orchestration の担当（me/orchestration.yaml）。
+openapi: 3.0.3
+info: {title: me-customer, version: "1"}
+paths:
+  /v1/me:
+    get:
+      operationId: getMe
+      x-sp-isolation: not_applicable:returns only the caller's own account resolved from the token
+      responses:
+        "200": {description: 自分のアカウント, content: {application/json: {schema: {$ref: '#/components/schemas/Account'}}}}
+        "401": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    Account:
+      type: object
+      required: [id, email, name, status, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        email: {type: string}
+        name: {type: string}
+        status: {type: string, enum: [active, withdrawn]}
+        created_at: {type: string, format: date-time}

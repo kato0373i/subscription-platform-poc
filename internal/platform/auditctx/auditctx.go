@@ -92,7 +92,7 @@ var maskedKeys = []string{"secret", "token", "password", "email", "name"}
 
 func masked(k string) bool {
 	k = strings.ToLower(k)
-	if k == "tenant_name" || k == "display_name_changed" {
+	if k == "tenant_name" || k == "key_name" || k == "display_name_changed" {
 		return false
 	}
 	for _, m := range maskedKeys {

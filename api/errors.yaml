@@ -66,3 +66,43 @@ codes:
     title: 事業者が有効ではありません
     owner: tenant
     description: 停止中の事業者のスタッフによる書き込み、販売できない事業者への操作
+  - code: tenant_state_conflict
+    status: 409
+    title: 事業者の状態がこの操作を許しません
+    owner: tenant
+    description: 承認・停止で許されない状態遷移（identity.md §3.1）
+  - code: fincode_shop_id_taken
+    status: 409
+    title: この fincode のショップ ID は使用されています
+    owner: tenant
+    description: 別の事業者が同じショップ ID で承認済み
+  - code: staff_already_exists
+    status: 409
+    title: このスタッフは登録済みです
+    owner: tenant
+    description: 同じテナントに同じ subject または email のスタッフがいる
+  - code: last_owner_required
+    status: 409
+    title: オーナーを 0 名にすることはできません
+    owner: tenant
+    description: 最後のオーナーの降格・削除
+  - code: api_key_limit_exceeded
+    status: 409
+    title: 有効な API キーの上限に達しています
+    owner: tenant
+    description: 有効なキーは 10 本まで
+  - code: account_withdrawn
+    status: 403
+    title: 退会済みのアカウントです
+    owner: customer
+    description: 退会した契約者のログイン（P-IDN-2）
+  - code: email_unverified
+    status: 403
+    title: メールアドレスが確認されていません
+    owner: customer
+    description: email クレームがない、または email_verified = false
+  - code: email_already_registered
+    status: 409
+    title: このメールアドレスは別のアカウントで登録済みです
+    owner: customer
+    description: 初回ログインで、email が他の有効なアカウントと重複（自動で紐づけない）

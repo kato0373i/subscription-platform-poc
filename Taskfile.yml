@@ -5,6 +5,7 @@ dotenv: [".env.local"]
 
 vars:
   GOLANGCI_IMAGE: golangci/golangci-lint:v2.14.0
+  SQLC_IMAGE: sqlc/sqlc:1.30.0
 
 tasks:
   default:
@@ -53,6 +54,8 @@ tasks:
     cmds:
       - docker compose --profile app --profile db --profile mail down -v --remove-orphans
       - for c in $(docker ps -aq --filter "name=ministack-rds-"); do docker rm -f "$c"; done
+      # MiniStack の RDS はデータを名前付きボリュームに置く（コンテナを消しても残る）
+      - for v in $(docker volume ls -q --filter "name=ministack-rds-"); do docker volume rm -f "$v"; done
       - rm -rf infra/envs/local/terraform.tfstate* .env.local .env.container e2e/.env.e2e .local/logs
 
   verify:local:
@@ -75,9 +78,14 @@ tasks:
 
   # ---- 生成・lint・テスト ----
   generate:
-    desc: コード生成（errcodes・TS の型）。生成物はコミットする
+    desc: コード生成（errcodes・sqlc・oapi-codegen・TS の型）。生成物はコミットする
     cmds:
       - go run ./internal/tools/errcodesgen
+      - |
+        if command -v sqlc >/dev/null 2>&1; then sqlc generate
+        else docker run --rm -v "$PWD:/src" -w /src {{.SQLC_IMAGE}} generate; fi
+      - go run ./internal/tools/apigen
+      - npx -y pnpm@9.15.9 --filter @sp/api-client generate
 
   lint:
     desc: golangci-lint（depguard・forbidigo など）と E2E のファイル名の規約

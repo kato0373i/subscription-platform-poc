@@ -31,7 +31,7 @@ var Pools = []UserPool{PoolConsumer, PoolStaff, PoolOperator}
 // Claims は検証済みの JWT の内容。
 type Claims struct {
 	Issuer, Subject, Email string
-	EmailVerified          bool
+	EmailVerified          *bool // クレームがなければ nil
 	Name                   string
 	Groups                 []string
 	ExpiresAt              time.Time
@@ -67,7 +67,7 @@ func claimsFrom(tok jwt.Token) Claims {
 	}
 	var b bool
 	if tok.Get("email_verified", &b) == nil {
-		c.EmailVerified = b
+		c.EmailVerified = &b
 	}
 	if tok.Get("name", &s) == nil {
 		c.Name = s

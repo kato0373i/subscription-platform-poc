@@ -49,7 +49,7 @@ export function createWorld(api: Api, tokens: Tokens, wait: Wait, testTag: strin
       expect(created.status, JSON.stringify(created.body)).toBe(201);
       const id = created.body.id;
       if (opts.approve !== false) {
-        const approved = await api.call("POST", `/v1/ops/tenants/${id}/approve`, { token: op, body: { fincode_shop_id: `shop_${id.slice(0, 8)}` } });
+        const approved = await api.call("POST", `/v1/ops/tenants/${id}/approve`, { token: op, body: { fincode_shop_id: `shop_${id.replaceAll("-", "")}` } });
         expect(approved.status, JSON.stringify(approved.body)).toBe(200);
       }
       const tenant: TenantWorld = { id, name, ownerToken: "", ownerSub: "" };

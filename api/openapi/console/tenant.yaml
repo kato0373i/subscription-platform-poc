@@ -1,0 +1,150 @@
+# 事業者コンソールのスタッフ・API キー管理（identity.md §7.2）。主体は staff、ヘッダー X-Tenant-Id 必須。
+openapi: 3.0.3
+info: {title: console-tenant, version: "1"}
+paths:
+  /v1/console/staff:
+    get:
+      operationId: consoleListStaff
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant after the membership check (RLS)
+      parameters:
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: スタッフの一覧（作成順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Staff'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/staff/{staff_id}:
+    patch:
+      operationId: consoleUpdateStaff
+      x-sp-permission: staff.manage
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/StaffIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [role]
+              properties:
+                role: {$ref: '#/components/schemas/Role'}
+      responses:
+        "200": {description: 変更後のスタッフ, content: {application/json: {schema: {$ref: '#/components/schemas/Staff'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+    delete:
+      operationId: consoleDeleteStaff
+      x-sp-permission: staff.manage
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/StaffIDPath'}
+      responses:
+        "204": {description: 削除した}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/api-keys:
+    post:
+      operationId: consoleCreateApiKey
+      x-sp-permission: apikey.manage
+      x-sp-isolation: not_applicable:creates a key in the caller's own tenant only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {type: string}
+      responses:
+        "201":
+          description: 発行したキー。api_key（平文）はこの応答にだけ含まれる
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, name, key_prefix, api_key, created_at]
+                properties:
+                  id: {type: string, format: uuid}
+                  name: {type: string}
+                  key_prefix: {type: string}
+                  api_key: {type: string}
+                  created_at: {type: string, format: date-time}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: consoleListApiKeys
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant after the membership check (RLS)
+      parameters:
+        - {name: status, in: query, schema: {type: string, enum: [active, revoked]}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: API キーの一覧（作成の新しい順）。平文は含まない
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/ApiKey'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/api-keys/{api_key_id}:
+    delete:
+      operationId: consoleRevokeApiKey
+      x-sp-permission: apikey.manage
+      x-sp-isolation: tested
+      parameters:
+        - {name: api_key_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204": {description: 失効した（失効済みも 204）}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    StaffIDPath: {name: staff_id, in: path, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    Role: {type: string, enum: [owner, admin, viewer]}
+    Staff:
+      type: object
+      required: [id, subject, email, display_name, role, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        subject: {type: string}
+        email: {type: string}
+        display_name: {type: string}
+        role: {$ref: '#/components/schemas/Role'}
+        created_at: {type: string, format: date-time}
+    ApiKey:
+      type: object
+      required: [id, name, key_prefix, status, created_at, revoked_at]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        key_prefix: {type: string}
+        status: {type: string, enum: [active, revoked]}
+        created_at: {type: string, format: date-time}
+        revoked_at: {type: string, format: date-time, nullable: true}

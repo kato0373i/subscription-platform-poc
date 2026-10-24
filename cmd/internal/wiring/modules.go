@@ -2,11 +2,17 @@ package wiring
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"io/fs"
 
 	"subscription-platform/internal/platform/httpx"
 	"subscription-platform/internal/platform/messaging"
 	"subscription-platform/internal/platform/scheduler"
+	sk "subscription-platform/internal/sharedkernel"
+	"subscription-platform/modules/customer"
+	"subscription-platform/modules/tenant"
+	tenantcontracts "subscription-platform/modules/tenant/contracts"
 )
 
 // ModuleSet は 1 モジュール分の組み立ての結果（規約 M7 の形）。各ドメインの TL がモジュールを実装したら、modules() に追加する。
@@ -17,15 +23,55 @@ type ModuleSet struct {
 	MountHTTP  func(*httpx.Router) error
 	Consumers  []messaging.ConsumerSpec
 	Jobs       []scheduler.Job
+	Ports      func(*httpx.Ports) // httpx に注入する関数（identity・audit）
 }
 
 // modules はプロセスに組み込むモジュール。マイグレーションの順序（tenant → … → audit）で並べる。
-// Platform の実装時点ではドメインのモジュールはまだない。
-func modules(_ context.Context, _ *Base, _ string) ([]ModuleSet, error) {
-	return nil, nil
+func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
+	codec, err := httpx.NewCursorCodec(b.Cfg.CursorKey)
+	if err != nil {
+		return nil, fmt.Errorf("cursor codec: %w", err)
+	}
+	t := tenant.New(tenant.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec})
+	c := customer.New(customer.Deps{Pool: b.Pool, Clock: b.Clock})
+	return []ModuleSet{
+		{Name: tenant.Name, HasOutbox: true, MountHTTP: t.MountHTTP, Ports: tenantPorts(t.Service())},
+		{Name: customer.Name, HasOutbox: true, MountHTTP: c.MountHTTP, Ports: func(p *httpx.Ports) { p.ResolveConsumer = c.ResolveConsumer }},
+	}, nil
 }
 
-// ports は httpx が使う modules の関数（identity・audit が実装されたら注入する）。
-func ports(_ []ModuleSet) httpx.Ports {
-	return httpx.Ports{}
+// tenantPorts は認証・認可のミドルウェアに tenant の contracts を渡す（§4.3）。
+func tenantPorts(svc tenantcontracts.Service) func(*httpx.Ports) {
+	return func(p *httpx.Ports) {
+		p.AuthenticateAPIKey = svc.AuthenticateAPIKey
+		p.GetStaffRole = func(ctx context.Context, t sk.TenantID, sub string) (string, error) {
+			r, err := svc.GetStaffRole(ctx, t, sub)
+			if errors.Is(err, tenantcontracts.ErrStaffNotFound) {
+				return "", nil
+			}
+			return string(r), err
+		}
+		p.Allows = func(role, perm string) bool {
+			return tenantcontracts.Allows(tenantcontracts.Role(role), tenantcontracts.Permission(perm))
+		}
+		p.IsWritePermission = func(perm string) bool { return tenantcontracts.Permission(perm).IsWrite() }
+		p.TenantWritable = func(ctx context.Context, t sk.TenantID) (bool, error) {
+			info, err := svc.GetTenant(ctx, t)
+			if errors.Is(err, tenantcontracts.ErrTenantNotFound) {
+				return false, nil
+			}
+			return err == nil && info.Status != tenantcontracts.TenantSuspended, err
+		}
+	}
+}
+
+// ports は httpx が使う modules の関数を集める。
+func ports(mods []ModuleSet) httpx.Ports {
+	var p httpx.Ports
+	for _, m := range mods {
+		if m.Ports != nil {
+			m.Ports(&p)
+		}
+	}
+	return p
 }

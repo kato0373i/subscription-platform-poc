@@ -29,3 +29,6 @@ components:
       content:
         application/problem+json:
           schema: {$ref: '#/components/schemas/Problem'}
+  parameters:
+    Limit: {name: limit, in: query, schema: {type: integer, minimum: 1, maximum: 100, default: 20}}
+    StartingAfter: {name: starting_after, in: query, description: 前のページの next_cursor, schema: {type: string, maxLength: 512}}

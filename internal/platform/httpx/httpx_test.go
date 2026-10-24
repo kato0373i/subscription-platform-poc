@@ -67,7 +67,7 @@ func TestVerifierRejectsBadTokens(t *testing.T) {
 	k := devKey(t)
 	v := httpx.NewDevJWTVerifier(&k.PublicKey)
 	ctx := context.Background()
-	if c, err := v.Verify(ctx, issue(t, k, httpx.PoolConsumer, nil), httpx.PoolConsumer); err != nil || c.Subject != "user-1" || !c.EmailVerified {
+	if c, err := v.Verify(ctx, issue(t, k, httpx.PoolConsumer, nil), httpx.PoolConsumer); err != nil || c.Subject != "user-1" || c.EmailVerified == nil || !*c.EmailVerified {
 		t.Fatalf("正しいトークン: %+v %v", c, err)
 	}
 	other := devKey(t)

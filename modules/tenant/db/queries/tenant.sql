@@ -1,0 +1,81 @@
+-- name: InsertTenant :exec
+INSERT INTO tenant.tenants (id, name, status, version, created_at, updated_at)
+VALUES ($1, $2, 'pending_review', 1, $3, $3);
+
+-- name: GetTenant :one
+SELECT * FROM tenant.tenants WHERE id = $1;
+
+-- name: GetTenantForUpdate :one
+SELECT * FROM tenant.tenants WHERE id = $1 FOR UPDATE;
+
+-- name: UpdateTenant :execrows
+UPDATE tenant.tenants
+SET status = $2, fincode_shop_id = $3, approved_at = $4, suspended_at = $5, suspend_reason = $6,
+    version = version + 1, updated_at = $7
+WHERE id = $1 AND version = $8;
+
+-- name: ListTenants :many
+SELECT * FROM tenant.tenants
+WHERE (sqlc.narg('status')::text IS NULL OR status = sqlc.narg('status'))
+  AND (sqlc.narg('after_created_at')::timestamptz IS NULL
+       OR (created_at, id) < (sqlc.narg('after_created_at')::timestamptz, sqlc.narg('after_id')::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $1;
+
+-- name: InsertStaff :exec
+INSERT INTO tenant.staff_members (id, tenant_id, subject, email, display_name, role, version, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $7);
+
+-- name: GetStaff :one
+SELECT * FROM tenant.staff_members WHERE id = $1;
+
+-- name: GetStaffBySubject :one
+SELECT * FROM tenant.staff_members WHERE tenant_id = $1 AND subject = $2;
+
+-- name: UpdateStaffRole :execrows
+UPDATE tenant.staff_members SET role = $2, version = version + 1, updated_at = $3 WHERE id = $1 AND version = $4;
+
+-- name: DeleteStaff :execrows
+DELETE FROM tenant.staff_members WHERE id = $1;
+
+-- name: CountOwners :one
+SELECT count(*) FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner';
+
+-- name: ListStaff :many
+SELECT * FROM tenant.staff_members
+WHERE tenant_id = $1
+  AND (sqlc.narg('after_created_at')::timestamptz IS NULL
+       OR (created_at, id) > (sqlc.narg('after_created_at')::timestamptz, sqlc.narg('after_id')::uuid))
+ORDER BY created_at, id
+LIMIT $2;
+
+-- name: ListOwners :many
+SELECT * FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner' ORDER BY created_at, id;
+
+-- name: InsertApiKey :exec
+INSERT INTO tenant.api_keys (id, tenant_id, name, key_prefix, key_hash, created_by, created_at, version)
+VALUES ($1, $2, $3, $4, $5, $6, $7, 1);
+
+-- name: GetApiKey :one
+SELECT * FROM tenant.api_keys WHERE id = $1;
+
+-- name: RevokeApiKey :execrows
+UPDATE tenant.api_keys SET revoked_at = $2, revoked_by = $3, version = version + 1 WHERE id = $1 AND revoked_at IS NULL;
+
+-- name: CountActiveApiKeys :one
+SELECT count(*) FROM tenant.api_keys WHERE tenant_id = $1 AND revoked_at IS NULL;
+
+-- name: ListApiKeys :many
+SELECT * FROM tenant.api_keys
+WHERE tenant_id = $1
+  AND (sqlc.narg('status')::text IS NULL
+       OR (sqlc.narg('status') = 'active' AND revoked_at IS NULL)
+       OR (sqlc.narg('status') = 'revoked' AND revoked_at IS NOT NULL))
+  AND (sqlc.narg('after_created_at')::timestamptz IS NULL
+       OR (created_at, id) < (sqlc.narg('after_created_at')::timestamptz, sqlc.narg('after_id')::uuid))
+ORDER BY created_at DESC, id DESC
+LIMIT $2;
+
+-- name: FindApiKeyByPrefix :one
+SELECT f.id::uuid AS id, f.tenant_id::uuid AS tenant_id, f.key_hash::bytea AS key_hash, (f.revoked_at IS NOT NULL)::boolean AS revoked
+FROM tenant.find_api_key_by_prefix(sqlc.arg(prefix)::text) f;

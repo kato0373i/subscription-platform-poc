@@ -111,3 +111,13 @@ func WriteJSON(w http.ResponseWriter, status int, v any) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(v)
 }
+
+// StrictRequestError は oapi-codegen の生成コードで、パラメータ・本文を読めなかったときの処理（ErrorHandlerFunc・RequestErrorHandlerFunc）。
+// 形式の誤りは通常 OpenAPI の検証で先に弾かれるので、ここに来るのは JSON として読めない本文など。
+func StrictRequestError(w http.ResponseWriter, r *http.Request, err error) {
+	observability.Logger("platform.http").LogAttrs(r.Context(), slog.LevelInfo, "http.request_invalid", observability.Err(err))
+	WriteProblem(w, r, Error(errcodes.ValidationFailed, "request could not be parsed", FieldError{Field: "body", Code: "invalid"}))
+}
+
+// StrictResponseError は strict server のハンドラが返した error の処理（ResponseErrorHandlerFunc）。
+func StrictResponseError(w http.ResponseWriter, r *http.Request, err error) { WriteProblem(w, r, err) }

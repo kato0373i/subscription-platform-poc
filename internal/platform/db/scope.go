@@ -20,9 +20,12 @@ type Scope struct {
 	Customer     *sk.CustomerAccountID
 	System       bool
 	SystemReason string
+	// Unscoped は「テナント・契約者を確定する前」の読み取り（API キーの認証、初回ログイン）。
+	// sp_<m> で動き、app.tenant_id・app.customer_account_id は空なので RLS のある表は 0 行になる（安全側）。
+	Unscoped bool
 }
 
-func (s Scope) empty() bool { return s.Tenant == nil && s.Customer == nil && !s.System }
+func (s Scope) empty() bool { return s.Tenant == nil && s.Customer == nil && !s.System && !s.Unscoped }
 
 func (s Scope) validate() error {
 	if s.empty() {
@@ -63,6 +66,19 @@ func WithSystemScope(ctx context.Context, reason string) context.Context {
 	}
 	s := scopeOf(ctx)
 	s.System, s.SystemReason = true, reason
+	return context.WithValue(ctx, scopeKey{}, s)
+}
+
+// WithUnscoped は主体を確定する前の処理（API キーの認証・初回ログインのアカウント作成）だけが使う。
+// RLS を越えない sp_<m> で動くので、RLS のある表は読めない。必要な行は SECURITY DEFINER 関数か RLS のない表から読む。
+func WithUnscoped(ctx context.Context, reason string) context.Context {
+	if reason == "" {
+		panic("db: WithUnscoped requires a reason")
+	}
+	s := scopeOf(ctx)
+	if s.empty() {
+		s.Unscoped = true
+	}
 	return context.WithValue(ctx, scopeKey{}, s)
 }
 

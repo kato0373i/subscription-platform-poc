@@ -196,6 +196,7 @@ func AfterCommit(ctx context.Context, f func(ctx context.Context))  // InTx の�
 func WithTenantScope(ctx context.Context, t sharedkernel.TenantID) context.Context
 func WithCustomerScope(ctx context.Context, c sharedkernel.CustomerAccountID) context.Context // tenant と併用可（OR）
 func WithSystemScope(ctx context.Context, reason string) context.Context // sp_<m>_sys を使う。reason は必須でログに出す
+func WithUnscoped(ctx context.Context, reason string) context.Context     // 主体を確定する前（API キーの認証・初回ログイン）。sp_<m> で動き、RLS のある表は 0 行（P-IMP-10）
 func ScopeFrom(ctx context.Context) (Scope, bool)
 var ErrNoScope, ErrConflictingScope error                   // system と tenant/customer の併用は ErrConflictingScope
 
@@ -356,7 +357,7 @@ Platform 自身はドメインイベントを購読しない。全購読者に�
 
 | ロール | 属性 | 権限 |
 |---|---|---|
-| `sp_owner` | NOLOGIN | 全スキーマ・テーブルの所有者。マイグレーションは `SET ROLE sp_owner` で行う |
+| `sp_owner` | NOLOGIN, BYPASSRLS | 全スキーマ・テーブルの所有者。マイグレーションは `SET ROLE sp_owner` で行う。所有する SECURITY DEFINER 関数（テナント未確定の検索）が FORCE RLS の表を読めるよう BYPASSRLS を持つ（P-IMP-7） |
 | `sp_app` | LOGIN, **NOINHERIT** | 実行時の接続ユーザー。自分では何の権限も持たず、トランザクションの先頭の `set_config('role', …, true)` で下のロールに切り替えるだけ（`GRANT … WITH INHERIT FALSE, SET TRUE`） |
 | `sp_<module>` | NOLOGIN, NOBYPASSRLS | 自分のスキーマの DML のみ。モジュール：tenant, customer, catalog, subscription, billing, payments, orchestration, integration, audit（reporting は作らない） |
 | `sp_<module>_sys` | NOLOGIN, BYPASSRLS | `sp_<module>` と同じ権限＋RLS を越えて読める |
@@ -1030,3 +1031,4 @@ e2e/
 | 2026-10-24 | ログと調査の仕組みを追加（NFR-017、P-OBS-1〜8、設計書 §1.4・ADR-009）。§8.6 を新設：observability（共通の項目、`LOG_SINKS`・ファイルのローテーション、モジュールごとの `LOG_LEVEL`、秘密情報の除去、`LOG_HTTP_BODY`）、標準のログの種類と出す箇所（外向きの HTTP の共通ラッパー、`domain.state_changed` の補助関数、pgx のトレーサーなど）、相関 ID の引き継ぎ、Fluent Bit → MiniStack の CloudWatch Logs、`cmd/devlogs` と `task logs`・`logs:cwl`・`logs:clean`・`db:reader`・`test:unit`・`test:integration`。相関 ID を任意の文字列にした（EventEnvelope・`outbox_events` の型を text に）。ヘッダー名を `X-Request-Id`・`X-Correlation-Id` にそろえ、Problem Details に `correlation_id` を追加。Playwright の `logs` fixture（相関 ID の付与と、失敗時の `logs.jsonl`・`timeline.txt` の添付）、CI の成果物 `local-logs`、compose の `fluent-bit`、Terraform のロググループを追加。AC-PLT-043・044 を修正し、073〜084 を追加。作らないもの（P-OBS-8）を §1 に明記。ステータスを Review に変更 | TL-Platform（Claude） |
 | 2026-10-24 | ログと調査の仕組みの追加（NFR-017、P-OBS-1〜9）について PdM の最終確認を経て、Fixed とする | PdM |
 | 2026-10-24 | 実装で確かめた MiniStack の制約と、実装時の決定を反映（P-OBS-10、P-IMP-1〜6）：ローカルは `SCHEDULER_MODE=internal`、結合テストと profile `db` の DB は `postgres:16-alpine`、Fluent Bit のための `ministack-tls`、AC-PLT-020 の障害の起こし方、配線の確認用の `platform-smoke`・`/v1/dev/smoke`・`platform-noop`、`platform` の SQL 関数をマイグレーションで作る、AC-PLT-077 の確かめ方。実装の状況は `docs/poc/impl/platform.md` | PdM |
+| 2026-10-24 | identity の実装時の決定を反映（P-IMP-7〜10）：§6.1 の `sp_owner` に BYPASSRLS、§4 に `db.WithUnscoped`。コード生成（§10.1）は `internal/tools/apigen`（oapi-codegen をライブラリとして呼ぶ）と sqlc のコンテナで動かす | PdM |

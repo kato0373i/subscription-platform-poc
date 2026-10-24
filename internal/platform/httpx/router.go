@@ -163,9 +163,10 @@ func (r *Router) readyz(w http.ResponseWriter, req *http.Request) {
 // SetShuttingDown は /readyz を 503 にする（SIGTERM を受けたとき）。
 func (r *Router) SetShuttingDown() { r.stopping.Store(true) }
 
-// ServeMux は oapi-codegen の HandlerFromMux に渡す登録口。
+// ServeMux は oapi-codegen の HandlerWithOptions（BaseRouter）に渡す登録口。
 type ServeMux interface {
 	HandleFunc(pattern string, handler func(http.ResponseWriter, *http.Request))
+	http.Handler
 }
 
 type mountMux struct {
@@ -181,6 +182,9 @@ func (m *mountMux) HandleFunc(pattern string, h func(http.ResponseWriter, *http.
 	}
 	m.r.mux.Handle(pattern, m.r.wrap(pol, http.HandlerFunc(h)))
 }
+
+// ServeHTTP は生成コードの ServeMux を満たすためだけにある（実際の振り分けは Router.Handler）。
+func (m *mountMux) ServeHTTP(w http.ResponseWriter, req *http.Request) { m.r.mux.ServeHTTP(w, req) }
 
 func normalizePattern(p string) string {
 	method, path, ok := strings.Cut(strings.TrimSpace(p), " ")

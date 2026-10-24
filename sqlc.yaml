@@ -1,0 +1,29 @@
+# sqlc の設定（platform.md §10.1）。`task generate` で生成し、生成物はコミットする。
+# 各モジュールのスキーマは db/migrations（goose の形式。Down は読まれない）から読む。
+version: "2"
+overrides:
+  go:
+    overrides:
+      - {db_type: uuid, go_type: github.com/google/uuid.UUID}
+      - {db_type: uuid, nullable: true, go_type: {import: github.com/google/uuid, type: UUID, pointer: true}}
+      - {db_type: timestamptz, go_type: time.Time}
+      - {db_type: timestamptz, nullable: true, go_type: {import: time, type: Time, pointer: true}}
+sql:
+  - engine: postgresql
+    schema: [internal/platform/db/sqlc/schemas.sql, modules/tenant/db/migrations]
+    queries: modules/tenant/db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: modules/tenant/internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+  - engine: postgresql
+    schema: [internal/platform/db/sqlc/schemas.sql, modules/customer/db/migrations]
+    queries: modules/customer/db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: modules/customer/internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true

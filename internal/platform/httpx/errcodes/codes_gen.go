@@ -33,6 +33,22 @@ const (
 	ClockBackwardNotAllowed Code = "clock_backward_not_allowed"
 	// TenantNotActive は 事業者が有効ではありません（403、owner: tenant）。
 	TenantNotActive Code = "tenant_not_active"
+	// TenantStateConflict は 事業者の状態がこの操作を許しません（409、owner: tenant）。
+	TenantStateConflict Code = "tenant_state_conflict"
+	// FincodeShopIdTaken は この fincode のショップ ID は使用されています（409、owner: tenant）。
+	FincodeShopIdTaken Code = "fincode_shop_id_taken"
+	// StaffAlreadyExists は このスタッフは登録済みです（409、owner: tenant）。
+	StaffAlreadyExists Code = "staff_already_exists"
+	// LastOwnerRequired は オーナーを 0 名にすることはできません（409、owner: tenant）。
+	LastOwnerRequired Code = "last_owner_required"
+	// ApiKeyLimitExceeded は 有効な API キーの上限に達しています（409、owner: tenant）。
+	ApiKeyLimitExceeded Code = "api_key_limit_exceeded"
+	// AccountWithdrawn は 退会済みのアカウントです（403、owner: customer）。
+	AccountWithdrawn Code = "account_withdrawn"
+	// EmailUnverified は メールアドレスが確認されていません（403、owner: customer）。
+	EmailUnverified Code = "email_unverified"
+	// EmailAlreadyRegistered は このメールアドレスは別のアカウントで登録済みです（409、owner: customer）。
+	EmailAlreadyRegistered Code = "email_already_registered"
 )
 
 // Info はコードの HTTP ステータスと題名。
@@ -57,6 +73,14 @@ var All = map[Code]Info{
 	ProviderUnavailable:     {Status: 503, Title: "決済代行が一時的に利用できません", Owner: "payments"},
 	ClockBackwardNotAllowed: {Status: 422, Title: "業務時刻は戻せません", Owner: "platform"},
 	TenantNotActive:         {Status: 403, Title: "事業者が有効ではありません", Owner: "tenant"},
+	TenantStateConflict:     {Status: 409, Title: "事業者の状態がこの操作を許しません", Owner: "tenant"},
+	FincodeShopIdTaken:      {Status: 409, Title: "この fincode のショップ ID は使用されています", Owner: "tenant"},
+	StaffAlreadyExists:      {Status: 409, Title: "このスタッフは登録済みです", Owner: "tenant"},
+	LastOwnerRequired:       {Status: 409, Title: "オーナーを 0 名にすることはできません", Owner: "tenant"},
+	ApiKeyLimitExceeded:     {Status: 409, Title: "有効な API キーの上限に達しています", Owner: "tenant"},
+	AccountWithdrawn:        {Status: 403, Title: "退会済みのアカウントです", Owner: "customer"},
+	EmailUnverified:         {Status: 403, Title: "メールアドレスが確認されていません", Owner: "customer"},
+	EmailAlreadyRegistered:  {Status: 409, Title: "このメールアドレスは別のアカウントで登録済みです", Owner: "customer"},
 }
 
 // Status はコードの HTTP ステータス（未登録なら 500）。

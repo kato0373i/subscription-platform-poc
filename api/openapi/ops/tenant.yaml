@@ -1,0 +1,128 @@
+# 運営者の事業者管理 API（identity.md §7.1）。主体は operator。
+openapi: 3.0.3
+info: {title: ops-tenant, version: "1"}
+paths:
+  /v1/ops/tenants:
+    post:
+      operationId: opsCreateTenant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [name]
+              properties:
+                name: {type: string}
+      responses:
+        "201": {description: 登録した事業者（pending_review）, content: {application/json: {schema: {$ref: '#/components/schemas/Tenant'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: opsListTenants
+      parameters:
+        - {name: status, in: query, schema: {$ref: '#/components/schemas/TenantStatus'}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 事業者の一覧（作成の新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Tenant'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/tenants/{tenant_id}:
+    get:
+      operationId: opsGetTenant
+      parameters:
+        - {$ref: '#/components/parameters/TenantIDPath'}
+      responses:
+        "200": {description: 事業者, content: {application/json: {schema: {$ref: '#/components/schemas/Tenant'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/tenants/{tenant_id}/approve:
+    post:
+      operationId: opsApproveTenant
+      parameters:
+        - {$ref: '#/components/parameters/TenantIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [fincode_shop_id]
+              properties:
+                fincode_shop_id: {type: string}
+      responses:
+        "200": {description: 承認後の事業者, content: {application/json: {schema: {$ref: '#/components/schemas/Tenant'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/tenants/{tenant_id}/suspend:
+    post:
+      operationId: opsSuspendTenant
+      parameters:
+        - {$ref: '#/components/parameters/TenantIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: {type: string}
+      responses:
+        "200": {description: 停止後の事業者, content: {application/json: {schema: {$ref: '#/components/schemas/Tenant'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/tenants/{tenant_id}/staff:
+    post:
+      operationId: opsCreateStaff
+      parameters:
+        - {$ref: '#/components/parameters/TenantIDPath'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [subject, email, display_name, role]
+              properties:
+                subject: {type: string}
+                email: {type: string}
+                display_name: {type: string}
+                role: {$ref: '../console/tenant.yaml#/components/schemas/Role'}
+      responses:
+        "201": {description: 作成したスタッフ, content: {application/json: {schema: {$ref: '../console/tenant.yaml#/components/schemas/Staff'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    TenantIDPath: {name: tenant_id, in: path, required: true, schema: {type: string, format: uuid}}
+  schemas:
+    TenantStatus: {type: string, enum: [pending_review, active, suspended]}
+    Tenant:
+      type: object
+      required: [id, name, status, fincode_shop_id, approved_at, suspended_at, suspend_reason, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        name: {type: string}
+        status: {$ref: '#/components/schemas/TenantStatus'}
+        fincode_shop_id: {type: string, nullable: true}
+        approved_at: {type: string, format: date-time, nullable: true}
+        suspended_at: {type: string, format: date-time, nullable: true}
+        suspend_reason: {type: string, nullable: true}
+        created_at: {type: string, format: date-time}

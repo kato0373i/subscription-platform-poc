@@ -1,6 +1,9 @@
 package archtest_test
 
 import (
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -53,6 +56,7 @@ func TestRepositoryFollowsRules(t *testing.T) {
 	if testing.Short() {
 		t.Skip("go/packages でリポジトリ全体を読むので -short では省略")
 	}
+	trackSources(t, "../..")
 	pkgs, err := packages.Load(&packages.Config{Mode: packages.NeedName | packages.NeedImports, Dir: "../..", Tests: true, BuildFlags: []string{"-tags=integration,devtools"}}, "./...")
 	if err != nil {
 		t.Fatal(err)
@@ -68,5 +72,26 @@ func TestRepositoryFollowsRules(t *testing.T) {
 	}
 	for _, v := range archtest.Check(graph) {
 		t.Error(v)
+	}
+}
+
+// trackSources は全 .go ファイルを stat する。packages.Load は子プロセス（go list）で読むので、
+// これがないと go test のキャッシュがファイルの追加・変更に気づかず、古い結果を返す。
+func trackSources(t *testing.T, root string) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(p string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && (d.Name() == "node_modules" || d.Name() == ".git" || d.Name() == ".local") {
+			return filepath.SkipDir
+		}
+		if !d.IsDir() && strings.HasSuffix(p, ".go") {
+			_, err = os.Stat(p)
+		}
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

@@ -3,14 +3,14 @@
 | 項目 | 内容 |
 |---|---|
 | 対象 | `docs/poc/specs/platform.md`（Fixed） |
-| 更新日 | 2026-10-24 |
+| 更新日 | 2026-10-24（identity の実装を反映） |
 | 実装時の決定 | `docs/poc/02-pdm-decisions.md` の P-OBS-10、P-IMP-1〜6 |
 
 ## 1. 確かめたこと
 
 | 確認 | 結果 |
 |---|---|
-| `task reset` → `task up` → `task dev`（go run）→ `task verify:local` → Playwright（parallel → clock） | 通る（11 件）。MiniStack の RDS（PostgreSQL 16）で、権限を絞った `sp_admin` から bootstrap・マイグレーションが通る |
+| `task reset` → `task up` → `task dev`（go run）→ `task verify:local` → Playwright（parallel → clock） | 通る（11 件）。※2026-10-24 の identity の実装時に、`task reset` が RDS のデータボリュームを残していたことが分かり直した。直した後に空の DB から通ることを確かめた（`docs/poc/impl/identity.md`）。MiniStack の RDS（PostgreSQL 16）で、権限を絞った `sp_admin` から bootstrap・マイグレーションが通る |
 | `task dev:container`（compose の profile app。CI と同じ） | 通る（11 件） |
 | `DB_MODE=container task up`（DB のフォールバック） | 通る（11 件） |
 | `task verify:fallback`（`MESSAGING_MODE=direct`） | 通る |
@@ -29,9 +29,9 @@
 | 001〜013 | ✅ | `internal/sharedkernel/*_test.go`（013 は fuzz） |
 | 014〜018 | ✅ | `internal/platform/db/db_integration_test.go` |
 | 019〜024 | ✅ | `internal/platform/messaging/integration_test.go`（023 は VT 2 秒・処理 5 秒に縮めて同じ性質を確かめる。020 は P-IMP-4） |
-| 025 | ⏳ identity | 認証の流れ（正しい主体・別の主体 403・トークンなし 401）はテスト用のルートで `httpx_test.go` が確かめている。`world` で作った主体での E2E は identity の実装後 |
+| 025 | 一部 ✅ | `world` で作った consumer・staff・operator の主体で、正しい主体・別の主体 403・トークンなし 401 を identity の E2E（`me-account`・`ops-tenants`・`console-*`）で確かめた。tenant_api の入口（`/v1/tenant/*`）は subscription の実装後 |
 | 026・028 | ✅ | `internal/platform/httpx/httpx_test.go` |
-| 027 | ⏳ identity | 所属していない staff の 403・`X-Tenant-Id` なしの 400 は `httpx_test.go`。停止中テナントの `tenant_not_active` の E2E は identity の実装後 |
+| 027 | ✅ | `e2e/tests/identity/console-authz.spec.ts`（所属していない 403、停止中の書き込みの `tenant_not_active`） |
 | 029・030・033 | ⏳ payments | Idempotency の仕組みは 031・032 で確かめ済み（キーなしの 400 も） |
 | 031・032 | ✅ | `internal/platform/httpx/integration_test.go` |
 | 034〜036 | ✅ | `httpx_test.go`、`internal/tools/errcodesgen` |
@@ -52,7 +52,7 @@
 | 061 | ✅ | `internal/platform/messaging/dispatch_test.go` |
 | 063・064 | ✅ | `messaging/integration_test.go` |
 | 066 | ✅（DB） | `db_integration_test.go`。`db` fixture からの書き込みの拒否は、ロールの設定（read only）で保証 |
-| 067 | ⏳ identity | `world.createTenant` は identity の API を呼ぶ形で実装済み |
+| 067 | ⏳ subscription | `world.createTenant` は identity の API で動く（identity の E2E で使用）。契約一覧での確認は subscription の実装後 |
 | 068・070 | ✅ | `e2e/tests/platform/clock-guard.spec.ts`・`wait.spec.ts`、`e2elint` |
 | 069 | ⏳ integration | `webhook-sink` 自体は `tools/webhook-sink` の UT で確かめ済み |
 | 072 | ⏳ 全ドメイン | `POST /v1/dev/seed/subscriptions`（`cmd/internal/wiring/devseed`）は各モジュールの contracts が必要 |

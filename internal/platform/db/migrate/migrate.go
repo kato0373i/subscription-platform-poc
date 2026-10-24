@@ -46,7 +46,9 @@ func Bootstrap(ctx context.Context, url string, opts Options) error {
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = %s) THEN CREATE ROLE %s %s; END IF;
 END $$`, quoteLiteral(name), name, attrs))
 	}
-	role("sp_owner", "NOLOGIN")
+	// sp_owner は BYPASSRLS：所有する SECURITY DEFINER 関数（テナント未確定の検索）が RLS を越えて読むため（P-IMP-7）
+	role("sp_owner", "NOLOGIN BYPASSRLS")
+	stmts = append(stmts, "ALTER ROLE sp_owner BYPASSRLS")
 	role("sp_app", "LOGIN NOINHERIT")
 	if opts.AppPassword != "" {
 		stmts = append(stmts, fmt.Sprintf("ALTER ROLE sp_app PASSWORD %s", quoteLiteral(opts.AppPassword)))

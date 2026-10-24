@@ -78,7 +78,7 @@
 
 | メソッド | 発行イベント | 監査注釈（ユースケースが書く） |
 |---|---|---|
-| `RegisterTenant(id, name, now)` | なし | `tenant.register`：後 = {name} |
+| `RegisterTenant(id, name, now)` | なし | `tenant.register`：後 = {tenant_name}（P-IMP-8） |
 | `Approve(shopID, now)` | `tenant.approved` | `tenant.approve`：前 = {status}、後 = {status, fincode_shop_id}（状態が変わったときのみ） |
 | `Suspend(reason, now)` | `tenant.suspended` | `tenant.suspend`：前 = {status}、後 = {status, reason}（状態が変わったときのみ） |
 | `CanSell() bool` / `AllowsStaffWrite() bool` | — | — |
@@ -130,7 +130,7 @@
 
 | メソッド | 条件 | 発行イベント | 監査注釈（ユースケースが書く） |
 |---|---|---|---|
-| `IssueApiKey(tenant, name, activeCount, rand)` → `(*ApiKey, rawKey)` | テナントが suspended でない。`activeCount < 10` | なし | `api_key.issue`：後 = {api_key_id, key_prefix, name}（平文・hash は入れない） |
+| `IssueApiKey(tenant, name, activeCount, rand)` → `(*ApiKey, rawKey)` | テナントが suspended でない。`activeCount < 10` | なし | `api_key.issue`：後 = {api_key_id, key_prefix, key_name}（平文・hash は入れない。キー名は P-IMP-8） |
 | `Revoke(by, now)` | — | なし | `api_key.revoke`：前 = {key_prefix, status: active}（失効済みへの再実行では書かない） |
 | `Matches(raw) bool` | `subtle.ConstantTimeCompare` で比較 | — |
 
@@ -587,7 +587,7 @@ console 共通のエラー（ミドルウェア）：`X-Tenant-Id` が無い・U
 | AC-IDN-033 | 契約者に active の契約がある | DELETE /v1/me | 409、アカウントは active のまま（判定は Orchestration、本書は Withdraw が呼ばれないことを確認） | FR-011, D-05 | e2e | E2E-018 |
 | AC-IDN-034 | owner が 2 名（作成順に X, Y）、admin が 1 名のテナント（suspended を含む） | `ListOwnerContacts` | X, Y の順に {staff_id, email, display_name} が返り、admin は含まれない。存在しないテナントは `ErrTenantNotFound` | FR-022, FR-023 | integration | — |
 | AC-IDN-035 | owner が admin のスタッフ S を viewer に変える | C2 を呼ぶ | 200。DB 確認：監査記録が `staff.change_role`・前 = {role: admin}・後 = {role: viewer} で、email・subject を含まない。Outbox にイベントは無い | FR-025 | e2e | `e2e/tests/identity/console-staff.spec.ts` |
-| AC-IDN-036 | owner | C4 で API キーを発行する | DB 確認：監査記録 `api_key.issue` に key_prefix と name があり、平文と hash は含まれない | FR-025, NFR-009 | e2e | `e2e/tests/identity/console-api-keys.spec.ts` |
+| AC-IDN-036 | owner | C4 で API キーを発行する | DB 確認：監査記録 `api_key.issue` に key_prefix と key_name があり、平文と hash は含まれない | FR-025, NFR-009 | e2e | `e2e/tests/identity/console-api-keys.spec.ts` |
 | AC-IDN-037 | 乱数源を固定した生成器 | API キーを生成し、`ParseKey` と `Matches` を呼ぶ | 平文が `^sk_[0-9A-Za-z]{12}_[0-9A-Za-z]{43}$`、prefix が先頭 15 文字。形式不正（区切り欠落・長さ違い・記号混入）は解析エラー、secret の 1 文字違いは `Matches` = false | NFR-009 | unit | — |
 
 ## 12. PdM への確認事項
@@ -612,3 +612,4 @@ console 共通のエラー（ミドルウェア）：`X-Tenant-Id` が無い・U
 | 2026-10-13 | テスト方針の変更（P-TST-1〜7）を反映。§11 にレベルの定義を追加し、AC-IDN-001〜036 のレベルを unit / integration / e2e で付け直し（e2e は Playwright と開発用 JWT、DB の確認は `sp_e2e_reader`）。AC-IDN-029・030 を API と contracts で分け直し、AC-IDN-037（API キーの形式、unit）を追加。ステータスを Fixed から Review に戻す | TL-Identity |
 | 2026-10-13 | P-TST-8 を反映。§11 の表に「e2e で確かめる場所」の列を追加し、e2e の 22 件に E2E シナリオの番号または `e2e/tests/identity/` の spec ファイル名の案（ops-tenants・console-authz・console-staff・console-api-keys・me-account・me-withdraw）を記載。ステータスは Review のまま | TL-Identity |
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
+| 2026-10-24 | 実装時の決定を反映（P-IMP-7・8・11）：監査注釈のキー名を `tenant_name`・`key_name` に変更（§3.1・§3.3・AC-IDN-036）。AC-IDN-019 の E2E は subscription の実装までは console のルートで確かめる（P-IMP-11）。実装の状況は `docs/poc/impl/identity.md` | PdM |

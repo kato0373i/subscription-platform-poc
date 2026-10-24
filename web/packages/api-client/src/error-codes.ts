@@ -13,7 +13,15 @@ export type ErrorCode =
   | "service_unavailable"
   | "provider_unavailable"
   | "clock_backward_not_allowed"
-  | "tenant_not_active";
+  | "tenant_not_active"
+  | "tenant_state_conflict"
+  | "fincode_shop_id_taken"
+  | "staff_already_exists"
+  | "last_owner_required"
+  | "api_key_limit_exceeded"
+  | "account_withdrawn"
+  | "email_unverified"
+  | "email_already_registered";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -29,4 +37,12 @@ export const errorStatus: Record<ErrorCode, number> = {
   provider_unavailable: 503,
   clock_backward_not_allowed: 422,
   tenant_not_active: 403,
+  tenant_state_conflict: 409,
+  fincode_shop_id_taken: 409,
+  staff_already_exists: 409,
+  last_owner_required: 409,
+  api_key_limit_exceeded: 409,
+  account_withdrawn: 403,
+  email_unverified: 403,
+  email_already_registered: 409,
 };
