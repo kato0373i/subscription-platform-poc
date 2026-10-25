@@ -40,7 +40,8 @@ export function ListTable<T>(p: {
   pager?: { page: number; hasMore: boolean; onNext: () => void; onPrev: () => void };
 }) {
   return (
-    <Paper>
+    <Paper style={{ overflow: "hidden" }}>
+      <Table.ScrollContainer minWidth={640} type="native">
       <Table highlightOnHover={!!p.onRowClick} verticalSpacing="sm">
         <Table.Thead bg="gray.0">
           <Table.Tr>
@@ -74,6 +75,7 @@ export function ListTable<T>(p: {
             ))}
         </Table.Tbody>
       </Table>
+      </Table.ScrollContainer>
       {!p.loading && (p.rows?.length ?? 0) === 0 && (
         <Stack align="center" gap={6} py={48}>
           <IconInbox size={32} stroke={1.5} color="var(--mantine-color-gray-5)" />

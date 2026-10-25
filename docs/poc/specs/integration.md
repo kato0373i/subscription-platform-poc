@@ -189,6 +189,7 @@
 | `plan.publish` / `plan.unpublish` | console | published | Catalog |
 | `coupon.create` / `coupon.disable` | console | 割引の内容・status | Catalog |
 | `dunning_policy.update` | console | retry_offsets | Billing |
+| `mrr_goal.update` / `mrr_goal.delete` | console | amount（target_id は月 YYYY-MM。console-dashboard FR-002） | Reporting |
 | `webhook_endpoint.create` / `.update` / `.delete` / `.rotate_secret` | console | url・event_types・status（鍵は入れない。rotate は previous_expires_at だけ） | Integration |
 | `webhook_delivery.redeliver` | console・ops | 元の配信 ID → 新しい配信 ID | Integration |
 | `invoice.collect` | ops | 請求の status | Orchestration |
@@ -684,6 +685,7 @@ integration から見た要件。項目名とポートは TL-Platform の platfo
 | 2026-10-13 | テストの方針の変更を反映（P-TST-1〜7）。§11 に、テストの方針、`webhook-sink` の要件（WS-1〜8。実装は TL-Platform）、メールの確かめ方（MiniStack の SES から取り出す方法は要検証。代わりに `email_notifications` の status・dedupe_key・variables を DB で確かめる）を追加。U3 を `WEBHOOK_INSECURE_ALLOWED_HOSTS` に置き換え、`webhook-sink` を許可。`email_notifications` に `subject` を追加し、送信時の変数を書き足すようにした。`RecordingMailer` を削除し `MAIL_MODE` を定義。AC-INT-001〜040 のレベルを unit・integration・e2e で付け直し、フェイク前提の記述をなくした。e2e の行に、確かめる場所（シナリオの番号、または `e2e/tests/integration/*.spec.ts`・`e2e/tests/audit/*.spec.ts`）を付け、時刻を進めるものは `.clock.spec.ts` に分けた（P-TST-8・9）。ステータスを Review に戻す | TL-Integration（Claude） |
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
 | 2026-10-26 | §3.6.1 に `staff.invite`・`staff.resend_invitation` を追加（business-console、P-IMP-22） | PdM |
+| 2026-10-26 | §3.6.1 に `mrr_goal.update`・`mrr_goal.delete` を追加（console-dashboard、P-IMP-23） | PdM |
 
 ## 付録 A. DDL
 

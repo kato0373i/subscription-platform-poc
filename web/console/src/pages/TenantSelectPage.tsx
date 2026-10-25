@@ -23,13 +23,13 @@ export function TenantSelectPage() {
     last = null;
   }
   if (!lost && data) {
-    if (data.length === 1) return <Navigate to={`/t/${data[0]!.tenant_id}/subscriptions`} replace />;
+    if (data.length === 1) return <Navigate to={`/t/${data[0]!.tenant_id}/dashboard`} replace />;
     const prev = data.find((m) => m.tenant_id === last);
-    if (prev && !params.has("choose")) return <Navigate to={`/t/${prev.tenant_id}/subscriptions`} replace />;
+    if (prev && !params.has("choose")) return <Navigate to={`/t/${prev.tenant_id}/dashboard`} replace />;
   }
   return (
     <Center mih="100vh" bg="#f6f8fa" p="md">
-      <Stack w={460}>
+      <Stack w="100%" maw={460} px="md">
         <Text fw={700} size="lg" c="brand.6" ta="center">
           事業者コンソール
         </Text>
@@ -49,7 +49,7 @@ export function TenantSelectPage() {
           )}
           <Stack gap="xs">
             {data?.map((m) => (
-              <UnstyledButton key={m.tenant_id} onClick={() => navigate(`/t/${m.tenant_id}/subscriptions`)} p="sm" style={{ border: "1px solid var(--mantine-color-gray-3)", borderRadius: 8 }}>
+              <UnstyledButton key={m.tenant_id} onClick={() => navigate(`/t/${m.tenant_id}/dashboard`)} p="sm" style={{ border: "1px solid var(--mantine-color-gray-3)", borderRadius: 8 }}>
                 <Group justify="space-between" wrap="nowrap">
                   <Group wrap="nowrap">
                     <Avatar color="brand" radius="md">

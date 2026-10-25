@@ -1,7 +1,8 @@
 // ルーティング（設計 §5.4）。/console を basename にし、事業者の中の画面は /t/:tenantId/... に置く。
+import { lazy, Suspense } from "react";
 import { createBrowserRouter, Navigate, RouterProvider } from "react-router";
 import { AppLayout } from "./components/AppLayout.tsx";
-import { RequireAuth, RequireTenant } from "./components/guards.tsx";
+import { FullLoader, RequireAuth, RequireTenant } from "./components/guards.tsx";
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage.tsx";
 import { LoginPage } from "./pages/auth/LoginPage.tsx";
 import { NewPasswordPage } from "./pages/auth/NewPasswordPage.tsx";
@@ -20,6 +21,9 @@ import { DeliveryDetailPage } from "./pages/webhooks/DeliveryDetailPage.tsx";
 import { EndpointDetailPage } from "./pages/webhooks/EndpointDetailPage.tsx";
 import { WebhooksPage } from "./pages/webhooks/WebhooksPage.tsx";
 
+// ダッシュボードはグラフのライブラリが大きいので遅延読み込み（console-dashboard ADR-R05）
+const DashboardPage = lazy(() => import("./pages/dashboard/DashboardPage.tsx").then((m) => ({ default: m.DashboardPage })));
+
 const router = createBrowserRouter(
   [
     { path: "/login", element: <LoginPage /> },
@@ -37,7 +41,15 @@ const router = createBrowserRouter(
             {
               element: <AppLayout />,
               children: [
-                { index: true, element: <Navigate to="subscriptions" replace /> },
+                { index: true, element: <Navigate to="dashboard" replace /> },
+                {
+                  path: "dashboard",
+                  element: (
+                    <Suspense fallback={<FullLoader />}>
+                      <DashboardPage />
+                    </Suspense>
+                  ),
+                },
                 { path: "subscriptions", element: <SubscriptionsPage /> },
                 { path: "subscriptions/:id", element: <SubscriptionDetailPage /> },
                 { path: "products", element: <ProductsPage /> },

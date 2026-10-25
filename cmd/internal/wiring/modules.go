@@ -26,6 +26,7 @@ import (
 	"subscription-platform/modules/orchestration"
 	"subscription-platform/modules/payments"
 	paymentscontracts "subscription-platform/modules/payments/contracts"
+	"subscription-platform/modules/reporting"
 	"subscription-platform/modules/subscription"
 	subscriptioncontracts "subscription-platform/modules/subscription/contracts"
 	"subscription-platform/modules/tenant"
@@ -60,7 +61,7 @@ type Services struct {
 	Payments     paymentscontracts.Service
 }
 
-// modules はプロセスに組み込むモジュール。マイグレーションの順序（tenant → … → audit）で並べる。
+// modules はプロセスに組み込むモジュール。マイグレーションの順序（tenant → … → audit → reporting）で並べる。
 func modules(_ context.Context, b *Base, process string) ([]ModuleSet, error) {
 	codec, err := httpx.NewCursorCodec(b.Cfg.CursorKey)
 	if err != nil {
@@ -117,6 +118,7 @@ func modules(_ context.Context, b *Base, process string) ([]ModuleSet, error) {
 		}
 	}
 	aud := audit.New(b.Pool, codec)
+	rep := reporting.New(reporting.Deps{Pool: b.Pool, Clock: b.Clock, Catalog: cat.Service()})
 	b.Services = Services{Tenant: t.Service(), Customer: c.Service(), Catalog: cat.Service(), Subscription: sub.Service(), Billing: bil.Service(), Payments: pay.Service()}
 	b.devMounts = append(b.devMounts, pay.MountDev)
 	return []ModuleSet{
@@ -129,6 +131,7 @@ func modules(_ context.Context, b *Base, process string) ([]ModuleSet, error) {
 		{Name: orchestration.Name, HasOutbox: true, MountHTTP: orc.MountHTTP, Consumers: orc.Consumers(), Jobs: orc.Jobs()},
 		integrationSet(intg),
 		{Name: audit.Name, MountHTTP: aud.MountHTTP, Ports: func(p *httpx.Ports) { p.AuditWriter = aud }},
+		{Name: reporting.Name, MountHTTP: rep.MountHTTP, Consumers: rep.Consumers()},
 	}, nil
 }
 

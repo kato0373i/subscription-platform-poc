@@ -35,17 +35,17 @@ tasks:
       - ./scripts/with-env.sh go run -tags devtools ./cmd/migrate up
 
   dev:
-    desc: 3 プロセスを go run（devtools ビルド）で並行に起動する
+    desc: 4 プロセスを go run（devtools ビルド）で並行に起動する
     cmds: [./scripts/dev.sh]
 
   dev:container:
-    desc: 3 プロセスを compose の profile app で起動する（CI と同じ）
+    desc: 4 プロセスを compose の profile app で起動する（CI と同じ）
     cmds:
       # コンテナは nonroot（uid 65532）で .local/logs に書く。Linux（CI）ではバインドマウントの権限がそのまま効くので、
       # ローカル専用のログ置き場を誰でも書けるようにしておく（macOS の Docker Desktop では不要だが害もない）
       - mkdir -p .local/logs && chmod a+rwx .local/logs && (chmod a+rw .local/logs/*.jsonl 2>/dev/null || true)
       - npx -y pnpm@9.15.9 --filter @sp/console build
-      - docker compose --profile app up -d --build --wait api worker-billing worker-integration console
+      - docker compose --profile app up -d --build --wait api worker-billing worker-integration worker-projection console
       - ./scripts/wait-ready.sh
 
   down:
@@ -63,7 +63,7 @@ tasks:
       - rm -rf infra/envs/local/terraform.tfstate* .env.local .env.container e2e/.env.e2e .local/logs
 
   verify:local:
-    desc: テストイベントを 1 件発行し、購読者まで届くことを確かめる（3 プロセスが起動している前提）
+    desc: テストイベントを 1 件発行し、購読者まで届くことを確かめる（4 プロセスが起動している前提）
     cmds: [./scripts/verify-local.sh]
 
   verify:ministack:
@@ -108,7 +108,7 @@ tasks:
     cmds: [go test -tags integration -p 4 ./...]
 
   e2e:
-    desc: Playwright の E2E（parallel → clock）。3 プロセスが起動している前提
+    desc: Playwright の E2E（parallel → clock）。4 プロセスが起動している前提
     dir: e2e
     cmds: [npx -y pnpm@9 exec playwright test --project=parallel --project=clock]
 

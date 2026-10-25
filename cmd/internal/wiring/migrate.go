@@ -10,11 +10,12 @@ import (
 	integrationdb "subscription-platform/modules/integration/db"
 	orchestrationdb "subscription-platform/modules/orchestration/db"
 	paymentsdb "subscription-platform/modules/payments/db"
+	reportingdb "subscription-platform/modules/reporting/db"
 	subscriptiondb "subscription-platform/modules/subscription/db"
 	tenantdb "subscription-platform/modules/tenant/db"
 )
 
-// MigrationSources は platform → tenant → … → audit の順のマイグレーション（§6.4）。
+// MigrationSources は platform → tenant → … → audit → reporting の順のマイグレーション（§6.4）。
 // 各ドメインの TL がモジュールを実装したら、ここに db/migrations を足す。
 func MigrationSources() []migrate.Source {
 	return append([]migrate.Source{
@@ -28,6 +29,7 @@ func MigrationSources() []migrate.Source {
 		{Schema: "orchestration", FS: migrate.SubFS(orchestrationdb.Migrations, "migrations")},
 		{Schema: "integration", FS: migrate.SubFS(integrationdb.Migrations, "migrations")},
 		{Schema: "audit", FS: migrate.SubFS(auditdb.Migrations, "migrations")},
+		{Schema: "reporting", FS: migrate.SubFS(reportingdb.Migrations, "migrations")},
 	}, devMigrationSources()...)
 }
 

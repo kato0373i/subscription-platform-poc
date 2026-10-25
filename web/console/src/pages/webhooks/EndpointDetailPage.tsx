@@ -161,7 +161,7 @@ function EditEndpointDrawer({ endpoint, opened, onClose }: { endpoint: Endpoint;
     onSuccess: onClose,
   });
   return (
-    <Drawer opened={opened} onClose={onClose} title="送信先を編集" position="right" size="md">
+    <Drawer opened={opened} onClose={onClose} title="送信先を編集" position="right">
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
         <Stack>
           <TextInput label="URL" withAsterisk {...form.getInputProps("url")} />

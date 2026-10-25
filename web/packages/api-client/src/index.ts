@@ -18,6 +18,7 @@ export type { paths as OpsOrchestrationPaths, components as OpsOrchestrationComp
 export type { paths as ConsoleIntegrationPaths, components as ConsoleIntegrationComponents } from "./gen/console-integration.ts";
 export type { paths as OpsIntegrationPaths, components as OpsIntegrationComponents } from "./gen/ops-integration.ts";
 export type { paths as OpsAuditPaths, components as OpsAuditComponents } from "./gen/ops-audit.ts";
+export type { paths as ConsoleReportingPaths, components as ConsoleReportingComponents } from "./gen/console-reporting.ts";
 export type { ErrorCode } from "./error-codes.ts";
 export { errorStatus } from "./error-codes.ts";
 

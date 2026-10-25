@@ -40,7 +40,7 @@ var (
 	consumerNamePattern = regexp.MustCompile(`^[a-z]+\.[a-z_]+$`)
 	eventTypePattern    = regexp.MustCompile(`^[a-z]+\.[a-z_0-9]+$`)
 	eventPrefixPattern  = regexp.MustCompile(`^[a-z]+\.[a-z_0-9]*$`)
-	processes           = map[string]bool{"api": true, "worker-billing": true, "worker-integration": true}
+	processes           = map[string]bool{"api": true, "worker-billing": true, "worker-integration": true, "worker-projection": true}
 )
 
 // LoadTopology は fsys の messaging.yaml を読み、検証する。

@@ -23,6 +23,7 @@ func TestAllowsMatchesTable(t *testing.T) {
 		contracts.PermWebhookManage:       {true, false, false},
 		contracts.PermAPIKeyManage:        {true, false, false},
 		contracts.PermStaffManage:         {true, false, false},
+		contracts.PermGoalWrite:           {true, true, false},
 	}
 	if len(table) != len(contracts.Permissions) {
 		t.Fatalf("表の行数 %d と Permissions の数 %d が違う", len(table), len(contracts.Permissions))

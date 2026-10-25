@@ -86,7 +86,7 @@ type WebhookConfig struct {
 // Getenv は環境変数の取得元（テストで差し替える）。
 type Getenv func(string) string
 
-// Load は service（api / worker-billing / worker-integration / migrate）の設定を読む。
+// Load は service（api / worker-billing / worker-integration / worker-projection / migrate）の設定を読む。
 func Load(service string) (Config, error) { return LoadFrom(service, os.Getenv, DevtoolsBuild) }
 
 // LoadFrom は取得元と devtools ビルドかを指定して読む。

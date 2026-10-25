@@ -149,6 +149,7 @@
 | `webhook.manage` | ✅ | webhook-endpoints の POST・PATCH・DELETE、rotate-secret | ✅ | ❌ | ❌ |
 | `apikey.manage` | ✅ | api-keys の POST・DELETE | ✅ | ❌ | ❌ |
 | `staff.manage` | ✅ | staff の PATCH・DELETE | ✅ | ❌ | ❌ |
+| `goal.write` | ✅ | ダッシュボードの MRR の目標の設定・削除（console-dashboard FR-002） | ✅ | ✅ | ❌ |
 
 - 新しい console API を作るときは、この表のどれかを付ける。付いていないルートは起動時にエラーにする（TL-Platform のミドルウェアで検査）。
 - `webhook.redeliver` を admin に許すのは、配信失敗の一次対応を運用担当（admin）が行えるようにするため。送信先・鍵の変更は owner のみ。
@@ -614,3 +615,4 @@ console 共通のエラー（ミドルウェア）：`X-Tenant-Id` が無い・U
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
 | 2026-10-24 | 実装時の決定を反映（P-IMP-7・8・11）：監査注釈のキー名を `tenant_name`・`key_name` に変更（§3.1・§3.3・AC-IDN-036）。AC-IDN-019 の E2E は subscription の実装までは console のルートで確かめる（P-IMP-11）。実装の状況は `docs/poc/impl/identity.md` | PdM |
 | 2026-10-24 | 監査のアクション名を integration.md §3.6.1 に揃えた（P-IMP-13）：`tenant.create`・`staff.create`・`staff.update_role`・`staff.delete`・`api_key.create` | PdM |
+| 2026-10-26 | §3.4 に `goal.write`（owner・admin）を追加（console-dashboard、P-IMP-23） | PdM |

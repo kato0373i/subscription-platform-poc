@@ -52,7 +52,7 @@ export function DunningPage() {
         <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
           <Section title="再請求のスケジュール">
             <Group align="flex-start" gap={48} wrap="wrap">
-              <Stack gap="sm" w={320}>
+              <Stack gap="sm" w={{ base: "100%", sm: 320 }}>
                 {days.map((_, i) => (
                   <Group key={i} gap="xs" wrap="nowrap">
                     <Text size="sm" w={72} c="dimmed">
@@ -63,7 +63,7 @@ export function DunningPage() {
                       suffix=" 日後"
                       min={1}
                       max={60}
-                      w={200}
+                      w={{ base: "100%", sm: 200 }}
                       disabled={!can.allowed}
                       aria-label={`${i + 1} 回目の再請求`}
                       {...form.getInputProps(`days.${i}`)}

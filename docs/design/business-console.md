@@ -440,3 +440,4 @@ sequenceDiagram
 | 2026-10-26 | 初版（Review）。ドメインの切り方（新しいモジュールは作らず、tenant の StaffMember に招待を足す。画面は API の利用者）はオーナーと合意済み | アーキテクト（Claude） |
 | 2026-10-26 | オーナーの承認によりステータスを Approved に変更。UI のデザインの方針（Stripe のダッシュボードを参考にする）を §5.6 に追加 | アーキテクト（Claude） |
 | 2026-10-26 | 実装を反映：フォームを `@mantine/form` に変更（§5.5・ADR-C02）、Cognito の fixture を SES のメールから読む形に変更（§8）、未解決事項 #2・#3 を解決 | アーキテクト（Claude） |
+| 2026-10-26 | 事業者を選んだ後の遷移先を `/t/:tenantId/dashboard` に変更、ナビゲーションの先頭にダッシュボード、狭い幅のレイアウト（`docs/design/console-dashboard.md` §7） | アーキテクト（Claude） |

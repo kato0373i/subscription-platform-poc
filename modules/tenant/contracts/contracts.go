@@ -50,12 +50,13 @@ const (
 	PermWebhookManage       Permission = "webhook.manage"
 	PermAPIKeyManage        Permission = "apikey.manage"
 	PermStaffManage         Permission = "staff.manage"
+	PermGoalWrite           Permission = "goal.write" // ダッシュボードの MRR の目標（console-dashboard FR-002）
 )
 
 // Permissions は全 Permission（表駆動テストと起動時の検査に使う）。
 var Permissions = []Permission{
 	PermConsoleRead, PermCatalogWrite, PermCouponWrite, PermDunningWrite, PermSubscriptionOperate,
-	PermWebhookRedeliver, PermWebhookManage, PermAPIKeyManage, PermStaffManage,
+	PermWebhookRedeliver, PermWebhookManage, PermAPIKeyManage, PermStaffManage, PermGoalWrite,
 }
 
 // allowed は §3.4 の表。カスタムロールを入れるときは Allows の実装だけを差し替える（§10）。
@@ -69,6 +70,7 @@ var allowed = map[Permission][]Role{
 	PermWebhookManage:       {RoleOwner},
 	PermAPIKeyManage:        {RoleOwner},
 	PermStaffManage:         {RoleOwner},
+	PermGoalWrite:           {RoleOwner, RoleAdmin},
 }
 
 // Allows はロールが Permission を持つか（純粋関数）。未知の Permission・ロールは false。

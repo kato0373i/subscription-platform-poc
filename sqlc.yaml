@@ -92,3 +92,12 @@ sql:
         out: modules/audit/internal/adapter/postgres/sqlcgen
         sql_package: pgx/v5
         emit_pointers_for_null_types: true
+  - engine: postgresql
+    schema: [internal/platform/db/sqlc/schemas.sql, modules/reporting/db/migrations]
+    queries: modules/reporting/db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: modules/reporting/internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true

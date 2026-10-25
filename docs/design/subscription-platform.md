@@ -1249,3 +1249,4 @@ sequenceDiagram
 | 2026-10-13 | テスト戦略を変更（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜7）。§1.2 の「テスト」の行を更新 | Claude（PdM） |
 | 2026-10-24 | §1.4（ログと調査）と ADR-009 を追加。NFR-017 を追跡表に追加（P-OBS-1〜8） | Claude（PdM） |
 | 2026-10-24 | Platform の実装で MiniStack の対応範囲を確かめ、未解決事項 #9 を閉じた（Scheduler のタイムゾーンと CloudWatch Logs の filter は対応していない → P-IMP-1・P-OBS-10） | Claude（PdM） |
+| 2026-10-26 | Reporting コンテキストを実装（`docs/design/console-dashboard.md`）。worker-projection を追加（P-PLT-4）。`reporting` スキーマの表は `subscription_facts`・`daily_metrics`（差分の足し込み。ADR-R02）・`price_amounts`・`mrr_goals` | アーキテクト（Claude） |

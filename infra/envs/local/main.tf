@@ -65,7 +65,7 @@ module "messaging" {
 
 # ログ（Fluent Bit の出力先。本番の /sp/<env>/<service> と同じ名前の付け方。§8.6.4）
 resource "aws_cloudwatch_log_group" "service" {
-  for_each          = toset(["api", "worker-billing", "worker-integration", "migrate", "unknown"])
+  for_each          = toset(["api", "worker-billing", "worker-integration", "worker-projection", "migrate", "unknown"])
   name              = "/sp/local/${each.key}"
   retention_in_days = 7
 }

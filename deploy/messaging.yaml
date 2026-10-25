@@ -91,3 +91,12 @@ queues:
     concurrency: 5
     visibility_timeout_s: 60
     max_receive: 5
+  # ダッシュボードの集計（console-dashboard 設計 §8）。集計の遅れ・失敗が課金・通知に影響しないよう専用のプロセス（ADR-R04）
+  - name: reporting-projection
+    process: worker-projection
+    consumer: reporting.projection
+    events: [subscription.started, subscription.renewed, subscription.recovered, subscription.plan_changed, subscription.past_due,
+      subscription.canceled, billing.invoice_paid]
+    concurrency: 10
+    visibility_timeout_s: 60
+    max_receive: 5

@@ -9,3 +9,4 @@ CREATE SCHEMA payments;
 CREATE SCHEMA orchestration;
 CREATE SCHEMA integration;
 CREATE SCHEMA audit;
+CREATE SCHEMA reporting;

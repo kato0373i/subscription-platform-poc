@@ -175,7 +175,7 @@ function EditPlanDrawer({ plan, opened, onClose }: { plan: Plan; opened: boolean
     onSuccess: onClose,
   });
   return (
-    <Drawer opened={opened} onClose={onClose} title="プランを編集" position="right" size="md">
+    <Drawer opened={opened} onClose={onClose} title="プランを編集" position="right">
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
         <Stack>
           <TextInput label="プラン名" withAsterisk {...form.getInputProps("name")} />
@@ -209,7 +209,7 @@ function PriceDrawer({ plan, opened, onClose }: { plan: Plan; opened: boolean; o
     onSuccess: onClose,
   });
   return (
-    <Drawer opened={opened} onClose={onClose} title="価格を改定" position="right" size="md">
+    <Drawer opened={opened} onClose={onClose} title="価格を改定" position="right">
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
         <Stack>
           <Text size="sm">

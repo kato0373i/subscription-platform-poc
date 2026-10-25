@@ -111,7 +111,7 @@ function CreateEndpointDrawer({ opened, onClose }: { opened: boolean; onClose: (
   });
   return (
     <>
-      <Drawer opened={opened} onClose={onClose} title="送信先を追加" position="right" size="md">
+      <Drawer opened={opened} onClose={onClose} title="送信先を追加" position="right">
         <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
           <Stack>
             <TextInput label="URL" placeholder="https://example.com/webhooks" description="インターネットから届く https の URL" withAsterisk {...form.getInputProps("url")} />

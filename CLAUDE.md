@@ -11,8 +11,8 @@
 
 ## ローカル環境とコマンド
 - 必要なもの：Docker・Go・Node。`task` がなければ `go tool task <名前>` で同じものが動く（terraform・golangci-lint はコンテナで動く）。
-- `task up`（MiniStack・RDS・キュー・マイグレーション）→ `task dev`（3 プロセスを go run）または `task dev:container` → `task verify:local`。
-- テスト：`task test:unit`・`task test:integration`・`task e2e`（3 プロセスが起動している前提）・`task lint`。
+- `task up`（MiniStack・RDS・キュー・マイグレーション）→ `task dev`（4 プロセスを go run）または `task dev:container` → `task verify:local`。
+- テスト：`task test:unit`・`task test:integration`・`task e2e`（4 プロセスが起動している前提）・`task lint`。
 - まっさらにする：`task reset`。
 - コード生成：`task generate`（errcodes・sqlc・oapi-codegen・TS の型）。`api/openapi/**`・`api/errors.yaml`・`modules/*/db/queries`・マイグレーションを変えたら流し、生成物もコミットする。
 

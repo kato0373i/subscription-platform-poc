@@ -39,7 +39,7 @@ test("FR-010: 契約をメールアドレスで検索し、詳細で契約者と
   const a = await subscribe(api, world, tenant, plan.id);
   await subscribe(api, world, tenant, plan.id);
   await signInAsNewStaff(page, api, mail, wait, tenant, "viewer", "subs");
-
+  await page.getByRole("link", { name: "契約" }).click();
   await expect(page.getByRole("row")).toHaveCount(3); // 見出し + 2 件
   await page.getByLabel("検索").fill(a.consumer.email);
   await expect(page.getByRole("row")).toHaveCount(2);

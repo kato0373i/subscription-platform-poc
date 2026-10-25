@@ -44,7 +44,7 @@ export function DeliveriesTable({ endpointId }: { endpointId?: string }) {
           placeholder="すべての状態"
           aria-label="状態"
           clearable
-          w={160}
+          w={{ base: "100%", sm: 160 }}
           value={status}
           onChange={(v) => (setStatus(v), pager.reset())}
           data={[
@@ -59,7 +59,7 @@ export function DeliveriesTable({ endpointId }: { endpointId?: string }) {
             placeholder="すべての送信先"
             aria-label="送信先"
             clearable
-            w={300}
+            w={{ base: "100%", sm: 300 }}
             value={ep}
             onChange={(v) => (setEp(v), pager.reset())}
             data={endpoints.data?.map((e) => ({ value: e.id, label: e.url })) ?? []}
@@ -70,7 +70,7 @@ export function DeliveriesTable({ endpointId }: { endpointId?: string }) {
           aria-label="イベント"
           clearable
           searchable
-          w={260}
+          w={{ base: "100%", sm: 260 }}
           value={type}
           onChange={(v) => (setType(v), pager.reset())}
           data={eventTypes.map((e) => ({ value: e.value, label: e.label }))}

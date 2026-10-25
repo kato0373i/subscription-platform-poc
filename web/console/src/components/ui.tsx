@@ -9,7 +9,7 @@ import { useCan } from "../api/tenant.tsx";
 
 export function PageHeader({ title, description, actions }: { title: ReactNode; description?: ReactNode; actions?: ReactNode }) {
   return (
-    <Group justify="space-between" align="flex-start" mb="lg" wrap="nowrap">
+    <Group justify="space-between" align="flex-start" mb="lg" gap="sm">
       <Box>
         <Title order={1}>{title}</Title>
         {description && (

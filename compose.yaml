@@ -1,7 +1,7 @@
 # ローカル開発・CI の環境（platform.md §8.4）。
 #   task up            # MiniStack・webhook-sink・Fluent Bit を起動し、Terraform で RDS・キュー・バスを作る
-#   task dev           # 3 プロセスを go run -tags devtools で起動する
-#   task dev:container # 3 プロセスをコンテナで起動する（profile app。CI と同じ）
+#   task dev           # 4 プロセスを go run -tags devtools で起動する
+#   task dev:container # 4 プロセスをコンテナで起動する（profile app。CI と同じ）
 name: sp
 
 x-app: &app
@@ -94,6 +94,13 @@ services:
     entrypoint: ["/usr/local/bin/worker-integration"]
     environment: {SERVICE_NAME: worker-integration, HEALTH_ADDR: ":8082"}
     ports: ["8082:8082"]
+
+  # ダッシュボードの集計（console-dashboard 設計 ADR-R04）
+  worker-projection:
+    <<: *app
+    entrypoint: ["/usr/local/bin/worker-projection"]
+    environment: {SERVICE_NAME: worker-projection, HEALTH_ADDR: ":8083"}
+    ports: ["8083:8083"]
 
   mailhog:
     image: mailhog/mailhog:v1.0.1

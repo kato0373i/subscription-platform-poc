@@ -4,7 +4,7 @@ import { useDebouncedValue } from "@mantine/hooks";
 import { IconSearch } from "@tabler/icons-react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router";
+import { useNavigate, useParams, useSearchParams } from "react-router";
 import { useApi } from "../../api/hooks.ts";
 import { useAllPlans } from "../../api/queries.ts";
 import type { Page, Subscription } from "../../api/types.ts";
@@ -24,7 +24,9 @@ export function SubscriptionsPage() {
   const api = useApi();
   const navigate = useNavigate();
   const { tenantId } = useParams();
-  const [status, setStatus] = useState("all");
+  const [params] = useSearchParams();
+  // ダッシュボードの「要対応」から ?status= 付きで来る（console-dashboard FR-006）
+  const [status, setStatus] = useState(() => (tabs.some((t) => t.value === params.get("status")) ? params.get("status")! : "all"));
   const [planId, setPlanId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [q] = useDebouncedValue(search.trim(), 400);
@@ -63,7 +65,7 @@ export function SubscriptionsPage() {
             leftSection={<IconSearch size={16} />}
             value={search}
             onChange={(e) => (setSearch(e.currentTarget.value), reset())}
-            w={360}
+            w={{ base: "100%", sm: 360 }}
             aria-label="検索"
           />
           <Select
@@ -72,7 +74,7 @@ export function SubscriptionsPage() {
             value={planId}
             onChange={(v) => (setPlanId(v), reset())}
             clearable
-            w={240}
+            w={{ base: "100%", sm: 240 }}
             aria-label="プラン"
           />
         </Group>

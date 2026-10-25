@@ -159,7 +159,7 @@ function CreateCouponDrawer({ opened, onClose }: { opened: boolean; onClose: () 
     onSuccess: () => (form.reset(), onClose()),
   });
   return (
-    <Drawer opened={opened} onClose={onClose} title="クーポンを作成" position="right" size="md">
+    <Drawer opened={opened} onClose={onClose} title="クーポンを作成" position="right">
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
         <Stack>
           <TextInput label="コード" placeholder="例：WELCOME10" description="申込のときに入力するコード（大文字にそろえます）" withAsterisk {...form.getInputProps("code")} />

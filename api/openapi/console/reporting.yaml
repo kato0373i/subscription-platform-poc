@@ -1,0 +1,161 @@
+# 事業者コンソールのダッシュボード（console-dashboard 設計 §5）。主体は staff、ヘッダー X-Tenant-Id 必須。
+openapi: 3.0.3
+info: {title: console-reporting, version: "1"}
+paths:
+  /v1/console/reports/overview:
+    get:
+      operationId: consoleGetReportOverview
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:reads only the X-Tenant-Id tenant's aggregates (RLS)
+      parameters:
+        - {name: month, in: query, description: "表示する月（YYYY-MM。既定は業務時刻の当月。過去 24 か月まで）", schema: {type: string, pattern: '^\d{4}-\d{2}$'}}
+      responses:
+        "200": {description: ダッシュボードの値, content: {application/json: {schema: {$ref: '#/components/schemas/Overview'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/mrr-goals/{month}:
+    put:
+      operationId: consolePutMrrGoal
+      x-sp-permission: goal.write
+      x-sp-isolation: not_applicable:writes only the X-Tenant-Id tenant's goal
+      parameters:
+        - {$ref: '#/components/parameters/MonthPath'}
+        - {name: If-Match, in: header, description: 楽観ロック（version。未設定の月は 0）, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [amount]
+              properties:
+                amount: {type: integer, format: int64, description: "目標の MRR（円。1 以上 10 億以下）"}
+      responses:
+        "200": {description: 保存した目標, content: {application/json: {schema: {$ref: '#/components/schemas/Goal'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+    delete:
+      operationId: consoleDeleteMrrGoal
+      x-sp-permission: goal.write
+      x-sp-isolation: not_applicable:deletes only the X-Tenant-Id tenant's goal
+      parameters:
+        - {$ref: '#/components/parameters/MonthPath'}
+      responses:
+        "204": {description: 削除した（なくても 204）}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    MonthPath: {name: month, in: path, required: true, schema: {type: string, pattern: '^\d{4}-\d{2}$'}}
+  schemas:
+    Rate:
+      type: object
+      required: [numerator, denominator, value]
+      properties:
+        numerator: {type: integer, format: int64}
+        denominator: {type: integer, format: int64}
+        value: {type: number, nullable: true, description: 分母が 0 なら null}
+    Goal:
+      type: object
+      required: [amount, version]
+      properties:
+        amount: {type: integer, format: int64}
+        version: {type: integer}
+    Kpis:
+      type: object
+      required: [new_subscriptions, new_mrr, canceled, churn_rate, revenue_churn_rate, trial_conversion, recovery, revenue, arpu, mrr, mrr_start, paying, trialing, past_due]
+      properties:
+        new_subscriptions: {type: integer}
+        new_mrr: {type: integer, format: int64}
+        canceled:
+          type: object
+          required: [total, customer, dunning, tenant_suspended]
+          properties:
+            total: {type: integer}
+            customer: {type: integer}
+            dunning: {type: integer}
+            tenant_suspended: {type: integer}
+        churn_rate: {$ref: '#/components/schemas/Rate'}
+        revenue_churn_rate: {$ref: '#/components/schemas/Rate'}
+        trial_conversion: {$ref: '#/components/schemas/Rate'}
+        recovery: {$ref: '#/components/schemas/Rate'}
+        revenue:
+          type: object
+          required: [total, initial, renewal]
+          properties:
+            total: {type: integer, format: int64}
+            initial: {type: integer, format: int64}
+            renewal: {type: integer, format: int64}
+        arpu: {type: integer, format: int64, nullable: true}
+        mrr: {type: integer, format: int64, description: 期末（当月なら現在）の MRR}
+        mrr_start: {type: integer, format: int64, description: 期首の MRR}
+        paying: {type: integer, format: int64}
+        trialing: {type: integer, format: int64}
+        past_due: {type: integer, format: int64}
+    Overview:
+      type: object
+      required: [month, as_of, today, is_current, kgi, kpis, trend, daily, attention]
+      properties:
+        month: {type: string}
+        as_of: {type: string, format: date-time, nullable: true, description: 集計表の最後の更新時刻}
+        today: {type: string, format: date}
+        is_current: {type: boolean}
+        kgi:
+          type: object
+          required: [mrr, mrr_start, arr, net_new_mrr, breakdown, goal]
+          properties:
+            mrr: {type: integer, format: int64}
+            mrr_start: {type: integer, format: int64}
+            arr: {type: integer, format: int64}
+            net_new_mrr: {type: integer, format: int64}
+            breakdown:
+              type: object
+              required: [new, expansion, contraction, churned]
+              properties:
+                new: {type: integer, format: int64}
+                expansion: {type: integer, format: int64}
+                contraction: {type: integer, format: int64}
+                churned: {type: integer, format: int64}
+            goal:
+              type: object
+              nullable: true
+              required: [amount, version, achievement_rate]
+              properties:
+                amount: {type: integer, format: int64}
+                version: {type: integer}
+                achievement_rate: {type: number}
+        kpis:
+          type: object
+          required: [current, previous]
+          properties:
+            current: {$ref: '#/components/schemas/Kpis'}
+            previous: {$ref: '#/components/schemas/Kpis'}
+        trend:
+          type: array
+          items:
+            type: object
+            required: [month, mrr, net_new_mrr, new_subscriptions, canceled, revenue]
+            properties:
+              month: {type: string}
+              mrr: {type: integer, format: int64}
+              net_new_mrr: {type: integer, format: int64}
+              new_subscriptions: {type: integer}
+              canceled: {type: integer}
+              revenue: {type: integer, format: int64}
+        daily:
+          type: array
+          items:
+            type: object
+            required: [date, mrr, new_subscriptions, canceled]
+            properties:
+              date: {type: string, format: date}
+              mrr: {type: integer, format: int64}
+              new_subscriptions: {type: integer}
+              canceled: {type: integer}
+        attention:
+          type: object
+          required: [past_due, trials_ending_7d]
+          properties:
+            past_due: {type: integer, format: int64}
+            trials_ending_7d: {type: integer, format: int64}

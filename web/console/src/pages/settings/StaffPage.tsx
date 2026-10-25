@@ -165,7 +165,7 @@ function InviteDrawer({ opened, onClose }: { opened: boolean; onClose: () => voi
     onSuccess: () => (form.reset(), onClose()),
   });
   return (
-    <Drawer opened={opened} onClose={onClose} title="スタッフを招待" position="right" size="md">
+    <Drawer opened={opened} onClose={onClose} title="スタッフを招待" position="right">
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
         <Stack>
           <TextInput label="メールアドレス" type="email" withAsterisk {...form.getInputProps("email")} />
@@ -198,7 +198,7 @@ function RoleModal({ staff, onClose }: { staff: Staff; onClose: () => void }) {
     onSuccess: onClose,
   });
   return (
-    <Drawer opened onClose={onClose} title={`${staff.display_name} のロール`} position="right" size="md">
+    <Drawer opened onClose={onClose} title={`${staff.display_name} のロール`} position="right">
       <Stack>
         <RoleRadios value={role} onChange={setRole} />
         <Group justify="flex-end">

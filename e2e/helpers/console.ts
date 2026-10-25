@@ -83,11 +83,11 @@ export async function login(page: Page, email: string, password: string, newPass
   }
 }
 
-/** 招待 → 初回ログイン（新しいパスワード）まで済ませ、事業者の契約の画面にいる状態にする。 */
+/** 招待 → 初回ログイン（新しいパスワード）まで済ませ、事業者のダッシュボード（最初の画面）にいる状態にする。 */
 export async function signInAsNewStaff(page: Page, api: Api, mail: Mail, wait: Wait, tenant: TenantWorld, role: "owner" | "admin" | "viewer", tag: string): Promise<CognitoStaff> {
   const inv = await inviteCognitoStaff(api, mail, wait, tenant, role, tag);
   const password = strongPassword();
   await login(page, inv.email, inv.temp, password);
-  await expect(page).toHaveURL(new RegExp(`/console/t/${tenant.id}/subscriptions$`));
+  await expect(page).toHaveURL(new RegExp(`/console/t/${tenant.id}/dashboard$`));
   return { email: inv.email, password, staffId: inv.staffId };
 }

@@ -4,10 +4,10 @@ import { randomUUID } from "node:crypto";
 import { test, expect } from "../../fixtures/index.ts";
 import { CONSOLE, latestResetCode, login, signInAsNewStaff, strongPassword } from "../../helpers/console.ts";
 
-test("FR-001・FR-006: 招待メールの仮パスワードでログインし、新しいパスワードを設定すると、所属する事業者の契約の画面が開く", async ({ page, api, world, mail, wait }) => {
+test("FR-001・FR-006: 招待メールの仮パスワードでログインし、新しいパスワードを設定すると、所属する事業者のダッシュボードが開く", async ({ page, api, world, mail, wait }) => {
   const tenant = await world.createTenant();
   const staff = await signInAsNewStaff(page, api, mail, wait, tenant, "admin", "login");
-  await expect(page.getByRole("heading", { name: "契約" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "ダッシュボード" })).toBeVisible();
   await expect(page.getByTestId("user-menu")).toContainText(staff.email);
   await expect(page.getByTestId("tenant-switcher")).toContainText(tenant.name);
 
@@ -24,7 +24,7 @@ test("FR-001・FR-006: 招待メールの仮パスワードでログインし、
 
   // 設定したパスワードでもう一度ログインできる
   await login(page, staff.email, staff.password);
-  await expect(page).toHaveURL(new RegExp(`/console/t/${tenant.id}/subscriptions$`));
+  await expect(page).toHaveURL(new RegExp(`/console/t/${tenant.id}/dashboard$`));
 });
 
 test("FR-001: 誤ったパスワードでは、アカウントの有無がわからない文言でエラーになる", async ({ page }) => {
@@ -52,7 +52,7 @@ test("FR-002: パスワードを忘れたら、メールの確認コードで再
   await expect(page).toHaveURL(/\/console\/login\?reason=reset/);
 
   await login(page, staff.email, next);
-  await expect(page).toHaveURL(new RegExp(`/console/t/${tenant.id}/subscriptions$`));
+  await expect(page).toHaveURL(new RegExp(`/console/t/${tenant.id}/dashboard$`));
 });
 
 test("FR-004: 複数の事業者に所属していれば、事業者を選んで切り替えられる。所属のない事業者の URL は選択の画面に戻る", async ({ page, api, world, mail, wait }) => {
@@ -69,10 +69,10 @@ test("FR-004: 複数の事業者に所属していれば、事業者を選んで
   await page.goto(`${CONSOLE}/console/tenants?choose`);
   await expect(page.getByText(a.name)).toBeVisible();
   await page.getByText(b.name).click();
-  await expect(page).toHaveURL(new RegExp(`/console/t/${b.id}/subscriptions$`));
+  await expect(page).toHaveURL(new RegExp(`/console/t/${b.id}/dashboard$`));
   await page.getByTestId("tenant-switcher").click();
   await page.getByRole("menuitem", { name: new RegExp(a.name) }).click();
-  await expect(page).toHaveURL(new RegExp(`/console/t/${a.id}/subscriptions$`));
+  await expect(page).toHaveURL(new RegExp(`/console/t/${a.id}/dashboard$`));
 
   const other = await world.createTenant();
   await page.goto(`${CONSOLE}/console/t/${other.id}/subscriptions`);

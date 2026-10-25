@@ -3,7 +3,7 @@
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-export type Proc = "api" | "worker-billing" | "worker-integration";
+export type Proc = "api" | "worker-billing" | "worker-integration" | "worker-projection";
 
 export interface Procs {
   kill(name: Proc): Promise<void>;

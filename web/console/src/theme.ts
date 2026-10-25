@@ -20,6 +20,7 @@ export const theme = createTheme({
     Table: { defaultProps: { verticalSpacing: "sm", horizontalSpacing: "md" } },
     Badge: { defaultProps: { variant: "light", radius: "sm", tt: "none" } },
     Modal: { defaultProps: { centered: true, radius: "md" } },
-    Drawer: { defaultProps: { position: "right", size: "md" } },
+    // 狭い画面では幅いっぱい（console-dashboard FR-008）
+    Drawer: { defaultProps: { position: "right", size: "min(100vw, 440px)" } },
   },
 });

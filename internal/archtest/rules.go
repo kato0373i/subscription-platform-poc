@@ -23,7 +23,7 @@ var Allowed = map[string][]string{
 	"orchestration": {"subscription", "billing", "payments", "catalog", "customer", "tenant"},
 	"integration":   {"customer", "tenant", "subscription", "billing"},
 	"audit":         {},
-	"reporting":     {},
+	"reporting":     {"catalog", "subscription", "billing"},
 }
 
 // Violation は規則違反 1 件。

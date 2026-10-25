@@ -101,7 +101,7 @@ function EditProductDrawer({ product, opened, onClose }: { product: Product; ope
     onSuccess: onClose,
   });
   return (
-    <Drawer opened={opened} onClose={onClose} title="商品を編集" position="right" size="md">
+    <Drawer opened={opened} onClose={onClose} title="商品を編集" position="right">
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
         <Stack>
           <TextInput label="商品名" withAsterisk {...form.getInputProps("name")} />
@@ -147,7 +147,7 @@ function CreatePlanDrawer({ productId, opened, onClose, onCreated }: { productId
     onSuccess: (p) => (form.reset(), onClose(), onCreated(p)),
   });
   return (
-    <Drawer opened={opened} onClose={onClose} title="プランを作成" position="right" size="md">
+    <Drawer opened={opened} onClose={onClose} title="プランを作成" position="right">
       <form onSubmit={form.onSubmit((v) => save.mutate(v))}>
         <Stack>
           <TextInput label="プラン名" placeholder="例：月額プラン" withAsterisk {...form.getInputProps("name")} />

@@ -15,8 +15,8 @@ import (
 	"github.com/pressly/goose/v3/database"
 )
 
-// Modules はロールとスキーマを作るモジュールの一覧（マイグレーションの順序でもある）。reporting は作らない。
-var Modules = []string{"tenant", "customer", "catalog", "subscription", "billing", "payments", "orchestration", "integration", "audit"}
+// Modules はロールとスキーマを作るモジュールの一覧（マイグレーションの順序でもある）。
+var Modules = []string{"tenant", "customer", "catalog", "subscription", "billing", "payments", "orchestration", "integration", "audit", "reporting"}
 
 // Source はスキーマ 1 つ分のマイグレーション。
 type Source struct {

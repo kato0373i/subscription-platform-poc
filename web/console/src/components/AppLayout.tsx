@@ -1,6 +1,8 @@
 // レイアウト（設計 §5.6）：左に固定のサイドバー（事業者の切り替え・主要メニュー・設定）、上部に薄いヘッダー（ユーザーメニュー）。
-import { Alert, AppShell, Avatar, Box, Container, Group, Menu, NavLink, ScrollArea, Text, UnstyledButton } from "@mantine/core";
-import { IconBox, IconChevronDown, IconCreditCard, IconKey, IconLogout, IconReceiptRefund, IconSelector, IconTicket, IconUsers, IconWebhook } from "@tabler/icons-react";
+// 幅が狭いとき（sm 未満）はサイドバーを隠し、ヘッダーのメニューボタンで開閉する（console-dashboard FR-008）。
+import { Alert, AppShell, Avatar, Box, Burger, Container, Group, Menu, NavLink, ScrollArea, Text, UnstyledButton } from "@mantine/core";
+import { useDisclosure } from "@mantine/hooks";
+import { IconBox, IconChartAreaLine, IconChevronDown, IconCreditCard, IconKey, IconLogout, IconReceiptRefund, IconSelector, IconTicket, IconUsers, IconWebhook } from "@tabler/icons-react";
 import { NavLink as RouterLink, Outlet, useNavigate, useParams } from "react-router";
 import { useAuth } from "../auth/AuthProvider.tsx";
 import { useMemberships, useTenant } from "../api/tenant.tsx";
@@ -37,7 +39,7 @@ function TenantSwitcher() {
       <Menu.Dropdown>
         <Menu.Label>事業者を切り替える</Menu.Label>
         {data?.map((m) => (
-          <Menu.Item key={m.tenant_id} onClick={() => navigate(`/t/${m.tenant_id}/subscriptions`)} rightSection={<Text size="xs" c="dimmed">{roleLabel[m.role]}</Text>}>
+          <Menu.Item key={m.tenant_id} onClick={() => navigate(`/t/${m.tenant_id}/dashboard`)} rightSection={<Text size="xs" c="dimmed">{roleLabel[m.role]}</Text>}>
             {m.tenant_name}
           </Menu.Item>
         ))}
@@ -47,6 +49,7 @@ function TenantSwitcher() {
 }
 
 const nav = [
+  { to: "dashboard", label: "ダッシュボード", icon: IconChartAreaLine },
   { to: "subscriptions", label: "契約", icon: IconReceiptRefund },
   { to: "products", label: "商品・プラン", icon: IconBox },
   { to: "coupons", label: "クーポン", icon: IconTicket },
@@ -62,6 +65,7 @@ export function AppLayout() {
   const { tenantId } = useParams();
   const t = useTenant();
   const auth = useAuth();
+  const [opened, { toggle, close }] = useDisclosure(false);
   const link = (i: (typeof nav)[number]) => (
     <NavLink
       key={i.to}
@@ -71,13 +75,15 @@ export function AppLayout() {
       leftSection={<i.icon size={18} stroke={1.6} />}
       style={{ borderRadius: 6 }}
       fw={500}
+      onClick={close}
     />
   );
   return (
-    <AppShell navbar={{ width: 240, breakpoint: 0 }} header={{ height: 52 }} padding="xl" bg="#f6f8fa">
-      <AppShell.Header px="lg" style={{ borderBottom: "1px solid var(--mantine-color-gray-2)" }}>
+    <AppShell navbar={{ width: 240, breakpoint: "sm", collapsed: { mobile: !opened } }} header={{ height: 52 }} padding={{ base: "md", sm: "xl" }} bg="#f6f8fa">
+      <AppShell.Header px={{ base: "md", sm: "lg" }} style={{ borderBottom: "1px solid var(--mantine-color-gray-2)" }}>
         <Group h="100%" justify="space-between">
-          <Group gap={8}>
+          <Group gap={8} wrap="nowrap">
+            <Burger opened={opened} onClick={toggle} hiddenFrom="sm" size="sm" aria-label="メニュー" data-testid="nav-toggle" />
             <Box w={22} h={22} bg="brand.6" style={{ borderRadius: 6 }} />
             <Text fw={700} size="sm">
               事業者コンソール
@@ -90,7 +96,9 @@ export function AppLayout() {
                   <Avatar size={26} radius="xl" color="gray">
                     {(auth.email ?? "?").slice(0, 1).toUpperCase()}
                   </Avatar>
-                  <Text size="sm">{auth.email}</Text>
+                  <Text size="sm" visibleFrom="sm">
+                    {auth.email}
+                  </Text>
                   <IconChevronDown size={14} />
                 </Group>
               </UnstyledButton>

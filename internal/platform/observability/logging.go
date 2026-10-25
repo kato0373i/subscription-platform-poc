@@ -17,7 +17,7 @@ import (
 
 // LogConfig は Setup の設定。config パッケージが環境変数から作る。
 type LogConfig struct {
-	Service  string // api | worker-billing | worker-integration | migrate
+	Service  string // api | worker-billing | worker-integration | worker-projection | migrate
 	Version  string
 	Env      string   // APP_ENV
 	Sinks    []string // stdout, file
