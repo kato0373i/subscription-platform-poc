@@ -5,6 +5,7 @@ import { createClock, type Clock } from "./clock.ts";
 import { createDb, type Db } from "./db.ts";
 import { attachOnFailure, createLogs, newCorrelationId, type Logs } from "./logs.ts";
 import { createMail, type Mail } from "./mail.ts";
+import { createProcs, type Procs } from "./procs.ts";
 import { createSink, type Sink } from "./sink.ts";
 import { createTokens, type Tokens } from "./tokens.ts";
 import { createWait, type Wait } from "./wait.ts";
@@ -19,6 +20,7 @@ interface Fixtures {
   clock: Clock;
   sink: Sink;
   mail: Mail;
+  procs: Procs;
   world: World;
 }
 
@@ -60,6 +62,11 @@ export const test = base.extend<Fixtures>({
   },
   mail: async ({ db, wait, request }, use) => {
     await use(createMail(db, wait, request));
+  },
+  procs: async ({}, use) => {
+    const p = createProcs();
+    await use(p);
+    await p.restoreAll();
   },
   world: async ({ api, tokens, wait }, use, testInfo) => {
     await use(createWorld(api, tokens, wait, testInfo.testId.slice(0, 10)));

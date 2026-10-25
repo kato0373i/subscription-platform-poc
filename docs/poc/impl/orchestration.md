@@ -46,7 +46,7 @@
 | 049〜051 | 一部 ✅ | 配線は deploy/messaging.yaml の検査と E2E、部分的な失敗は Platform の messaging のテスト。同時実行数の計測は E2E-020 の拡張で行う |
 | E2E-001 の申込ページ | ✅ | E2E-001 の ① をブラウザの申込ページ（`/checkout?plan_id=…`）で行う |
 | webhook-sink の確認・E2E-015 | ✅ | E2E-001（W1 への配信と `cus_`）・E2E-019（payment_method_changed が届かない）・E2E-015（integration の実装で追加。`docs/poc/impl/integration.md`） |
-| E2E-014 の worker-billing の停止 | ⏳ procs fixture | 再開の正しさは結合テスト（AC-ORC-047・048） |
+| E2E-014 の worker-billing の停止 | ✅ | `e2e/fixtures/procs.ts`（`docker compose kill -s SIGKILL` → `up -d --wait`）。投入のカーソルからの再開は結合テスト（AC-ORC-047・048）でも確認 |
 
 ## 4. 他の TL への引き継ぎ
 
@@ -66,4 +66,4 @@
 - NFR-001（1 日 10 万件を 4 時間以内 ≒ 6.9 件/秒）を、1 タスクのローカル環境でも上回る。
 - リース 1 分では、キューで 1 分以上待った請求が毎時の `billing-collection-due` で同じ collection_seq のまま再送され（同じ回収キーなので二重課金にはならない）、「進行中のプロセスがある」として 60 秒後に回されるので、途中で約 60 秒止まった。リースは回収キューの待ち時間より長くする必要がある（本番の 6h は十分）。
 - 1 分のリースのときの段階ごとの内訳：投入ジョブ（1 万件の FIFO 送信）約 66 秒、請求の発行 約 15.6 件/秒（いちばん遅い段階。`orc-renewal.fifo` の同時実行 10）、Outbox の中継の遅れは最大 111 秒。
-- 計測の手順：本番相当で測るときは `.env.container` の `BILLING_COLLECTION_LEASE` を `6h` にしてプロセスを起動し直し、`cd e2e && E2E_PERF_COUNT=10000 pnpm e2e:perf`。結果は `e2e/test-results/e2e-020-result.json`（推移を含む）に残る。終わったら `./scripts/local-env.sh` で戻す。
+- 計測の手順：本番相当で測るときは `.env.container` の `BILLING_COLLECTION_LEASE` を `6h` にしてプロセスを起動し直し、`cd e2e && E2E_PERF_COUNT=10000 pnpm e2e:perf`。結果は `e2e/test-results/e2e-020-result.json`（推移を含む）に残る。終わったら `./scripts/local-env.sh` で戻す。計測で作った 1 万件の契約は DB に残り、同じ更新日の E2E を遅くするので、計測の後は `task reset` で作り直す（P-IMP-20 ③）。
