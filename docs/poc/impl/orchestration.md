@@ -44,7 +44,7 @@
 | 024〜026・028・052〜054 | ✅ | `modules/orchestration/internal/domain/decide_test.go`、E2E-002・007・008・022 |
 | 027 | ✅ | E2E-010 |
 | 049〜051 | 一部 ✅ | 配線は deploy/messaging.yaml の検査と E2E、部分的な失敗は Platform の messaging のテスト。同時実行数の計測は E2E-020 の拡張で行う |
-| E2E-001 の申込ページ | ⏳ 申込ページ | ブラウザでのトークン化（AC-PAY-007） |
+| E2E-001 の申込ページ | ✅ | E2E-001 の ① をブラウザの申込ページ（`/checkout?plan_id=…`）で行う |
 | webhook-sink の確認・E2E-015 | ✅ | E2E-001（W1 への配信と `cus_`）・E2E-019（payment_method_changed が届かない）・E2E-015（integration の実装で追加。`docs/poc/impl/integration.md`） |
 | E2E-014 の worker-billing の停止 | ⏳ procs fixture | 再開の正しさは結合テスト（AC-ORC-047・048） |
 

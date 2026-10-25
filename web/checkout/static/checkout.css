@@ -1,0 +1,7 @@
+body { font-family: system-ui, sans-serif; margin: 0; background: #f7f7f8; color: #222; }
+main { max-width: 28rem; margin: 2rem auto; padding: 1.5rem; background: #fff; border-radius: 8px; }
+label { display: block; margin: 0.75rem 0; font-size: 0.9rem; }
+input { display: block; width: 100%; box-sizing: border-box; padding: 0.5rem; font-size: 1rem; margin-top: 0.25rem; }
+button { width: 100%; padding: 0.75rem; font-size: 1rem; margin-top: 1rem; }
+#result[data-status="error"] { color: #b00020; }
+#result[data-status="succeeded"] { color: #0a7a2f; }

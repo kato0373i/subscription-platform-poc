@@ -37,9 +37,10 @@ components:
   schemas:
     CheckoutPlan:
       type: object
-      required: [plan_id, product, name, description, billing_interval, trial_days, amount, tax_rate, price_version_id]
+      required: [plan_id, tenant_id, product, name, description, billing_interval, trial_days, amount, tax_rate, price_version_id]
       properties:
         plan_id: {type: string, format: uuid}
+        tenant_id: {type: string, format: uuid, description: 申込 API（POST /v1/me/subscriptions）に渡す事業者 ID}
         product:
           type: object
           required: [id, name]

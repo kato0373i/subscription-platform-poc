@@ -80,8 +80,11 @@ type CheckoutPlan struct {
 		Id   openapi_types.UUID `json:"id"`
 		Name string             `json:"name"`
 	} `json:"product"`
-	TaxRate   string `json:"tax_rate"`
-	TrialDays int    `json:"trial_days"`
+	TaxRate string `json:"tax_rate"`
+
+	// TenantId 申込 API（POST /v1/me/subscriptions）に渡す事業者 ID
+	TenantId  openapi_types.UUID `json:"tenant_id"`
+	TrialDays int                `json:"trial_days"`
 }
 
 // CheckoutPlanBillingInterval defines model for CheckoutPlan.BillingInterval.

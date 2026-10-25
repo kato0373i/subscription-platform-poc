@@ -43,6 +43,11 @@ export interface components {
         CheckoutPlan: {
             /** Format: uuid */
             plan_id: string;
+            /**
+             * Format: uuid
+             * @description 申込 API（POST /v1/me/subscriptions）に渡す事業者 ID
+             */
+            tenant_id: string;
             product: {
                 /** Format: uuid */
                 id: string;

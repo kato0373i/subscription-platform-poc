@@ -1,22 +1,31 @@
 // E2E-001 トライアルなしの申込（orchestration.md §11b.3）：AC-ORC-001、AC-BIL-011、P-X-3。
-// 申込ページ（ブラウザでのカードのトークン化）は申込ページの実装後に追加する。ここでは API で支払方法を登録する。
+// ① はブラウザで申込ページを開き、テストカード（4242…）を stub-tokenizer.js でトークン化して申し込む（シナリオの中で 1 回だけブラウザを使う。§11b.2）。
 import { test, expect } from "../../fixtures/index.ts";
 import { createPlan } from "../../helpers/catalog.ts";
+import { STUB_CARDS, fillCardAndSubmit, openCheckout } from "../../helpers/checkout.ts";
 import { bodyOf, sinkEndpoint } from "../../helpers/integration.ts";
-import { checkout, expectInvariants, type Consumer } from "../../helpers/orchestration.ts";
+import { expectInvariants, type Checkout201, type Consumer } from "../../helpers/orchestration.ts";
 import { verifySignature } from "../../helpers/webhook-signature.ts";
 
-test("E2E-001: トライアルなしの申込は 201 active、請求 paid（caller_managed）、試行 1 件（invoice:{id}:1）", async ({ api, world, db, wait, sink }) => {
+test("E2E-001: トライアルなしの申込は 201 active、請求 paid（caller_managed）、試行 1 件（invoice:{id}:1）", async ({ page, api, world, db, wait, sink }) => {
   const tenant = await world.createTenant({ apiKey: true });
   const plan = await createPlan(api, tenant, { amount: 980 });
   const w1 = await sinkEndpoint(api, sink, tenant, ["subscription.started", "invoice.paid"]);
   const consumer = (await world.createConsumer()) as Consumer;
-  const pm = await world.createPaymentMethod(consumer, "ok");
   const today = ((await api.dev.getClock()).body as { today: string }).today;
 
-  const res = await checkout(api, consumer, tenant, plan.id, pm.id);
-  expect(res.status, JSON.stringify(res.body)).toBe(201);
-  const { subscription: sub, invoice } = res.body;
+  // ① 申込ページ → 支払方法の登録（トークンだけ）→ ② POST /v1/me/subscriptions
+  await openCheckout(page, `plan_id=${plan.id}`, consumer.token);
+  const pmRes = page.waitForResponse((r) => r.url().endsWith("/v1/me/payment-methods") && r.request().method() === "POST");
+  const subRes = page.waitForResponse((r) => r.url().endsWith("/v1/me/subscriptions") && r.request().method() === "POST");
+  await fillCardAndSubmit(page, STUB_CARDS.ok);
+  const pm = (await (await pmRes).json()) as { id: string; display: { last4: string } };
+  expect(pm.display.last4).toBe("4242");
+  const res = await subRes;
+  expect(res.status()).toBe(201);
+  await expect(page.locator("#result")).toHaveText("お申し込みが完了しました。");
+  const { subscription: sub, invoice } = (await res.json()) as Checkout201;
+  expect(await db.count("SELECT count(*) FROM subscription.subscriptions WHERE id = $1 AND payment_method_id = $2", [sub.id, pm.id])).toBe(1);
   expect(sub).toMatchObject({ status: "active", tenant_id: tenant.id, plan_id: plan.id, trial_applied: false, trial_end: null });
   expect(sub.current_period.start).toBe(today);
   const end = new Date(`${sub.current_period.end}T00:00:00Z`);

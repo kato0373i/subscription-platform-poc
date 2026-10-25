@@ -54,6 +54,8 @@ jobs:
       - uses: actions/setup-node@v4
         with: {node-version: "24"}
       - run: npm i -g pnpm@9.15.9 && pnpm install --frozen-lockfile
+      - name: 申込ページのテスト用のブラウザ（AC-PAY-007・E2E-001）
+        run: pnpm --filter @sp/e2e exec playwright install --with-deps chromium
       - name: ローカル環境（MiniStack・RDS・キュー・マイグレーション）
         run: go tool task up
       - name: 3 プロセス（devtools ビルドのコンテナ）

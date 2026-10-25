@@ -395,13 +395,13 @@ func (c cachePublic) VisitCheckoutGetPlanResponse(w nethttp.ResponseWriter) erro
 }
 
 func (h *checkoutHandlers) CheckoutGetPlan(ctx context.Context, req checkout.CheckoutGetPlanRequestObject) (checkout.CheckoutGetPlanResponseObject, error) {
-	cp, _, err := h.svc.GetCheckoutPlan(ctx, sk.IDFromUUID[contracts.PlanTag](req.PlanId))
+	cp, tenantID, err := h.svc.GetCheckoutPlan(ctx, sk.IDFromUUID[contracts.PlanTag](req.PlanId))
 	if err != nil {
 		return nil, problem(err)
 	}
 	p := cp.Plan
 	out := checkout.CheckoutGetPlan200JSONResponse{
-		PlanId: p.ID.UUID(), Name: p.Name, Description: p.Description, BillingInterval: checkout.CheckoutPlanBillingInterval(p.Interval),
+		PlanId: p.ID.UUID(), TenantId: tenantID.UUID(), Name: p.Name, Description: p.Description, BillingInterval: checkout.CheckoutPlanBillingInterval(p.Interval),
 		TrialDays: p.TrialDays, Amount: p.CurrentPrice.AmountYen(), TaxRate: p.CurrentPrice.TaxRate.String(), PriceVersionId: p.CurrentPrice.ID.UUID(),
 	}
 	out.Product.Id, out.Product.Name = p.ProductID.UUID(), cp.ProductName

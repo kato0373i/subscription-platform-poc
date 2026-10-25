@@ -43,7 +43,7 @@
 | 032 | ✅ | `webhook-stub.spec.ts` |
 | 019 | 一部 ✅ | 非同期の確定が Webhook の経路で反映されることは `stub-settle.spec.ts`。更新課金を通す確認は billing・orchestration の実装後 |
 | 004・008・009・015・016・026・028・033 | ✅ | E2E-016・001、`orchestration/checkout-declined.spec.ts`、E2E-011、`orchestration/checkout-unknown-fail.spec.ts`・`withdraw.spec.ts`、E2E-007・009 |
-| 007 | ⏳ 申込ページ | ブラウザでのトークン化 |
+| 007 | ✅ | `e2e/tests/payments/checkout-pan.spec.ts`（§11.3 の手順 1〜11 を 3 枚のカードで。申込ページは `web/checkout`） |
 | 017・022 | 一部 ✅ | 照合の振る舞いは結合テスト。E2E（clock）は未作成 |
 
 ## 4. 他の TL への引き継ぎ
