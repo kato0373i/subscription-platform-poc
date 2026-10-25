@@ -39,8 +39,8 @@
 | 006・008・009・012・026・030 | ✅ | `modules/billing/internal/app/integration_test.go` |
 | 031 | ✅ | `e2e/tests/billing/invoices.spec.ts`（E2E-016 での確認は orchestration の実装時） |
 | 032・033（HTTP の 400）・034 | ✅ | `e2e/tests/billing/dunning-policy.spec.ts` |
-| 038 | 一部 ✅ | サービス層（seq+1・リース中は同じ seq）は結合テスト、HTTP の 409・404 は `ops-collect.spec.ts`。scheduled の請求への 202 は更新課金（orchestration）の実装後 |
-| 020・022・028・035〜037・039 | ⏳ orchestration | 更新課金・ダニング・解約のシナリオ（E2E-007〜011・021・022） |
+| 038 | 一部 ✅ | サービス層（seq+1・リース中は同じ seq）は結合テスト、HTTP の 409・404 は `ops-collect.spec.ts`。scheduled の請求への 202 の E2E は未作成（更新課金で作れるようになった） |
+| 020・022・028・035〜037・039 | ✅ | E2E-009・011・010・007・008・021・022（`e2e/tests/scenarios/`） |
 
 ## 4. 他の TL への引き継ぎ
 

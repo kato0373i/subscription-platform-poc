@@ -32,6 +32,26 @@ jobs:
     process: worker-billing
     schedule: "cron(0 * * * ? *)"
     dedupe: hourly
+  # 更新処理の投入（orchestration.md §4.2。毎日 00:30 JST）
+  - name: orchestration-renewal-dispatch
+    process: worker-billing
+    schedule: "cron(30 0 * * ? *)"
+    dedupe: daily
+  # 止まったプロセス・サガの再開（§8。10 分ごと）
+  - name: orchestration-process-sweeper
+    process: worker-billing
+    schedule: "cron(0/10 * * * ? *)"
+    dedupe: none
+  # 事業者の停止に伴う一括解約（§4.7。毎分）
+  - name: orchestration-bulk-cancellation
+    process: worker-billing
+    schedule: "cron(* * * * ? *)"
+    dedupe: none
+  # 完了・中断したサガの削除（§8。毎日 03:30 JST、30 日超）
+  - name: orchestration-checkout-saga-gc
+    process: worker-billing
+    schedule: "cron(30 3 * * ? *)"
+    dedupe: daily
   # トライアル終了の予告（subscription.md §8。毎日 09:00 JST）
   - name: subscription-trial-will-end
     process: worker-billing

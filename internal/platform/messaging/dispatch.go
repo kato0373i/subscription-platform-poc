@@ -72,6 +72,12 @@ func (d *Dispatcher) Dispatch(ctx context.Context, msgs []Message) Outcome {
 			}
 		default:
 			out.Retry = append(out.Retry, m)
+			if delay := RetryDelay(err); delay > 0 {
+				if out.Delay == nil {
+					out.Delay = map[string]time.Duration{}
+				}
+				out.Delay[m.ID] = delay
+			}
 			if d.queue.FIFO {
 				failedGroups[m.GroupID] = true
 			}

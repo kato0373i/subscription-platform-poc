@@ -44,7 +44,14 @@ export type ErrorCode =
   | "outcome_mismatch"
   | "payable_already_paid"
   | "invoice_not_collectible"
-  | "collection_in_progress";
+  | "collection_in_progress"
+  | "payment_method_unavailable"
+  | "payment_method_reentry_required"
+  | "payment_declined"
+  | "subscription_not_modifiable"
+  | "payment_method_in_use"
+  | "has_open_subscriptions"
+  | "billing_run_in_progress";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -91,4 +98,11 @@ export const errorStatus: Record<ErrorCode, number> = {
   payable_already_paid: 409,
   invoice_not_collectible: 409,
   collection_in_progress: 409,
+  payment_method_unavailable: 422,
+  payment_method_reentry_required: 422,
+  payment_declined: 422,
+  subscription_not_modifiable: 409,
+  payment_method_in_use: 409,
+  has_open_subscriptions: 409,
+  billing_run_in_progress: 409,
 };

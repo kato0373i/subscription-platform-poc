@@ -221,7 +221,7 @@ func (h consoleHandlers) ConsoleListInvoices(ctx context.Context, req console.Co
 }
 
 func (h consoleHandlers) ConsoleGetInvoice(ctx context.Context, req console.ConsoleGetInvoiceRequestObject) (console.ConsoleGetInvoiceResponseObject, error) {
-	s, err := h.svc.GetInvoice(ctx, sk.IDFromUUID[sk.InvoiceTag](req.InvoiceId))
+	s, err := h.svc.GetInvoiceState(ctx, sk.IDFromUUID[sk.InvoiceTag](req.InvoiceId))
 	if err != nil {
 		return nil, problem(err)
 	}

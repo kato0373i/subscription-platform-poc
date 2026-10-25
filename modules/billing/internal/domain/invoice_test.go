@@ -146,6 +146,10 @@ func TestIssueModes(t *testing.T) {
 	eq(t, "reason", ev[1].Payload["reason"], any(c.ReasonInitial))
 	eq(t, "status", x.State().Status, c.StatusOpen)
 
+	z := issue(t, cmd(300, &c.AppliedDiscount{Type: sk.DiscountAmount, Value: 500}, c.ModeCallerManaged), now)
+	eq(t, "zero caller_managed status", z.State().Status, c.StatusPaid)
+	eq(t, "zero caller_managed seq", z.State().CollectionSeq, 1) // invoices_caller_managed の CHECK
+
 	y := issue(t, cmd(980, nil, c.ModeCallerManaged), now)
 	eqTypes(t, y.Events(), c.EventInvoiceIssued)
 	eq(t, "next nil", y.State().NextCollectionAt == nil, true)

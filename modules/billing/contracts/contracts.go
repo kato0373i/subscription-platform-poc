@@ -173,6 +173,8 @@ type Service interface {
 	VoidOpenInvoices(ctx context.Context, subscriptionID sk.SubscriptionID, reason VoidReason) ([]InvoiceView, error)
 	// GetOpenInvoice は非終端の請求。なければ nil, nil。
 	GetOpenInvoice(ctx context.Context, subscriptionID sk.SubscriptionID) (*InvoiceView, error)
+	// GetInvoice は ID で読む（状態に関係なく）。なければ ErrInvoiceNotFound。申込の再実行の応答と sweeper が使う。
+	GetInvoice(ctx context.Context, invoiceID sk.InvoiceID) (InvoiceView, error)
 }
 
 var (

@@ -39,8 +39,8 @@
 | 011・036・041・042 | ✅ | `modules/subscription/internal/app/integration_test.go` |
 | 015 | 一部 ✅ | 取り消し後に更新されることは unit。`renewal-dispatch` を通す E2E は orchestration の実装後 |
 | 022 | ✅ | `e2e/tests/subscription/plan-change.spec.ts` |
-| 004・016・039・040 | ⏳ orchestration | 申込・日次の更新・支払い遅延中の解約のシナリオ（040 の適用日の規則は unit で確かめている） |
-| 029 | ⏳ orchestration | システムの予約の取り消し不可は unit。`tenant.suspended` を購読して予約する E2E は orchestration の実装後 |
+| 004・016・039・040 | ✅ | E2E-001・002・006・010（040 の適用日の規則は unit） |
+| 029 | ✅ | E2E-012（取り消し不可は unit） |
 | 032 | ✅ | `tenant-subscriptions.spec.ts` |
 | 033 | 一部 ✅ | active の利用権は `tenant-subscriptions.spec.ts`。past_due は orchestration の実装後 |
 | 034 | 一部 ✅ | 一覧の絞り込み（plan_id・customer_id・status）は `console-subscriptions.spec.ts`。past_due・canceled を混ぜた確認は orchestration の実装後 |

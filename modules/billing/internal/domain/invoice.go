@@ -161,6 +161,9 @@ func NewInvoice(id sk.InvoiceID, cmd c.IssueInvoiceCmd, now time.Time, lease tim
 	switch {
 	case total.IsZero(): // INV-5：0 円は作成と同時に paid。回収要求を出さない
 		x.s.Status, x.s.PaidAt, x.s.PaidVia = c.StatusPaid, &now, ptr("zero_amount")
+		if cmd.CollectionMode == c.ModeCallerManaged {
+			x.s.CollectionSeq = 1 // INV-8：caller_managed は collection_seq=1（決済はしない）
+		}
 		x.emit(c.EventInvoicePaid, x.paidPayload())
 	case cmd.CollectionMode == c.ModeScheduled:
 		x.s.NextCollectionAt = &now

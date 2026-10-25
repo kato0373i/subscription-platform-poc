@@ -29,7 +29,9 @@ type Problem struct {
 	RequestID     string        `json:"request_id"`
 	CorrelationID string        `json:"correlation_id"`
 	Errors        []FieldError  `json:"errors,omitempty"`
-	RetryAfter    int           `json:"-"`
+	// DeclineCategory は payment_declined の契約者向けの分類（card_expired / insufficient_funds / generic。orchestration.md §7.1）
+	DeclineCategory string `json:"decline_category,omitempty"`
+	RetryAfter      int    `json:"-"`
 }
 
 func (p *Problem) Error() string {

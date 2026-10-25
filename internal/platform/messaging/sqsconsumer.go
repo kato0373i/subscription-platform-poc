@@ -171,6 +171,9 @@ func (c *consumer) process(ctx context.Context, msgs []Message) {
 		if backoff > c.cfg.RetryMax || backoff <= 0 {
 			backoff = c.cfg.RetryMax
 		}
+		if d, ok := out.Delay[m.ID]; ok {
+			backoff = d
+		}
 		c.changeVisibility(ctx, m, backoff)
 		if m.ReceiveCount >= c.q.MaxReceive {
 			c.log.LogAttrs(ctx, slog.LevelError, "event.dlq", slog.String("queue", c.q.Name), slog.String("message_id", m.ID),

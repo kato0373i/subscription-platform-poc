@@ -60,6 +60,7 @@ LOG_LEVEL=debug
 LOG_SINKS=stdout,file
 LOG_HTTP_BODY=redacted
 DEV_JWT_KEY_PATH=deploy/local/dev-jwt.pem
+BILLING_COLLECTION_LEASE=1m
 ENV
 }
 

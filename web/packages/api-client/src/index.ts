@@ -13,6 +13,8 @@ export type { paths as OpsPaymentsPaths, components as OpsPaymentsComponents } f
 export type { paths as MeBillingPaths, components as MeBillingComponents } from "./gen/me-billing.ts";
 export type { paths as ConsoleBillingPaths, components as ConsoleBillingComponents } from "./gen/console-billing.ts";
 export type { paths as OpsBillingPaths, components as OpsBillingComponents } from "./gen/ops-billing.ts";
+export type { paths as MeOrchestrationPaths, components as MeOrchestrationComponents } from "./gen/me-orchestration.ts";
+export type { paths as OpsOrchestrationPaths, components as OpsOrchestrationComponents } from "./gen/ops-orchestration.ts";
 export type { ErrorCode } from "./error-codes.ts";
 export { errorStatus } from "./error-codes.ts";
 
@@ -26,4 +28,5 @@ export interface Problem {
   request_id: string;
   correlation_id: string;
   errors?: { field: string; code: string }[];
+  decline_category?: string;
 }

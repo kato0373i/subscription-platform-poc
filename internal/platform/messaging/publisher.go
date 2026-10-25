@@ -141,6 +141,38 @@ func (s *SQSCommandSender) SendFIFO(ctx context.Context, queue string, env sk.Ev
 	return nil
 }
 
+// FIFOMessage は SendFIFOBatch の 1 件。
+type FIFOMessage struct {
+	Env              sk.EventEnvelope
+	GroupID, DedupID string
+}
+
+// SendFIFOBatch は FIFO キューに 10 件ずつ送る（SendMessageBatch。orchestration.md §4.2）。1 件でも失敗したらエラー（呼び出し元はチャンクごと再送する）。
+func (s *SQSCommandSender) SendFIFOBatch(ctx context.Context, queue string, msgs []FIFOMessage) error {
+	url := aws.String(QueueURL(s.urlPrefix, queue))
+	for start := 0; start < len(msgs); start += 10 {
+		chunk := msgs[start:min(start+10, len(msgs))]
+		entries := make([]sqstypes.SendMessageBatchRequestEntry, len(chunk))
+		for i, m := range chunk {
+			b, err := json.Marshal(m.Env)
+			if err != nil {
+				return fmt.Errorf("messaging: marshal envelope: %w", err)
+			}
+			entries[i] = sqstypes.SendMessageBatchRequestEntry{
+				Id: aws.String(fmt.Sprintf("m%d", i)), MessageBody: aws.String(string(b)), MessageGroupId: aws.String(m.GroupID), MessageDeduplicationId: aws.String(m.DedupID),
+			}
+		}
+		out, err := s.client.SendMessageBatch(ctx, &sqs.SendMessageBatchInput{QueueUrl: url, Entries: entries})
+		if err != nil {
+			return fmt.Errorf("messaging: send fifo batch %s: %w", queue, err)
+		}
+		if len(out.Failed) > 0 {
+			return fmt.Errorf("messaging: send fifo batch %s: %d failed (%s)", queue, len(out.Failed), aws.ToString(out.Failed[0].Message))
+		}
+	}
+	return nil
+}
+
 // SendRaw は任意の本文を標準キューに送る（scheduler キューへの投入用）。
 func SendRaw(ctx context.Context, c *sqs.Client, queueURL, body string) error {
 	if _, err := c.SendMessage(ctx, &sqs.SendMessageInput{QueueUrl: aws.String(queueURL), MessageBody: aws.String(body)}); err != nil {

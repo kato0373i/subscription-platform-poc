@@ -4,6 +4,7 @@ package payments
 
 import (
 	"context"
+	"errors"
 
 	"subscription-platform/internal/platform/db"
 	"subscription-platform/internal/platform/httpx"
@@ -125,3 +126,15 @@ func (m *Module) Jobs() []scheduler.Job {
 
 // Problem は payments のエラーを Problem にする（申込 API の配線で使う）。対応がなければ nil。
 func Problem(err error) *httpx.Problem { return payhttp.Problem(err) }
+
+// StubSetBehavior は StubAdapter の支払方法の結果を remaining 回だけ上書きする（dev API と他モジュールの結合テスト用。Stub がなければエラー）。
+func (m *Module) StubSetBehavior(ctx context.Context, pm sk.PaymentMethodID, scenario string, remaining int) error {
+	if m.stub == nil {
+		return errors.New("payments: stub adapter is not enabled")
+	}
+	ref, err := m.svc.MethodRef(ctx, pm, StubProvider)
+	if err != nil {
+		return err
+	}
+	return m.stub.SetBehavior(ctx, ref, scenario, remaining)
+}

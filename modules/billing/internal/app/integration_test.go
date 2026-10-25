@@ -296,10 +296,10 @@ func TestIsolation(t *testing.T) {
 	cmd.Discount = &c.AppliedDiscount{Type: sk.DiscountPercent, Value: 50}
 	v, _ := f.svc.IssueInvoice(context.Background(), cmd)
 	other := db.WithTenantScope(context.Background(), sk.NewID[sk.TenantTag]())
-	if _, err := f.svc.GetInvoice(other, v.ID); !errors.Is(err, c.ErrInvoiceNotFound) {
+	if _, err := f.svc.GetInvoiceState(other, v.ID); !errors.Is(err, c.ErrInvoiceNotFound) {
 		t.Errorf("other tenant: %v", err)
 	}
-	if st, err := f.svc.GetInvoice(db.WithTenantScope(context.Background(), cmd.TenantID), v.ID); err != nil || len(st.Lines) != 2 {
+	if st, err := f.svc.GetInvoiceState(db.WithTenantScope(context.Background(), cmd.TenantID), v.ID); err != nil || len(st.Lines) != 2 {
 		t.Errorf("own tenant: %v %v", st.Lines, err)
 	}
 	mine, _, err := f.svc.ListInvoices(db.WithCustomerScope(context.Background(), cmd.CustomerAccountID), cmd.SubscriptionID, postgres.Page{Limit: 20})

@@ -46,7 +46,7 @@
 | 021・023〜025 | ✅ | `me-account.spec.ts` |
 | 022・026〜028・030〜032 | ✅ | `modules/customer/internal/app/integration_test.go`（031 は退会の API が orchestration なので、結合テストで確かめている） |
 | 029 | 一部 ✅ | `Withdraw` のマスキング・`customer.withdrawn`（tenant_id = null）・リンクが残ることは結合テスト。`DELETE /v1/me` の E2E（`me-withdraw.spec.ts`）は orchestration の実装後 |
-| 033 | ⏳ orchestration | E2E-018 |
+| 033 | ✅ | E2E-018 |
 | 035・036 | ✅（監査記録は ⏳ audit） | `console-staff.spec.ts`・`console-api-keys.spec.ts`。`staff.update_role`・`api_key.create` の注釈は書いている（キー名は P-IMP-8） |
 
 Platform の AC で identity を待っていたもの（`docs/poc/impl/platform.md` も更新済み）：AC-PLT-027 は ✅。AC-PLT-025 は tenant_api の入口（`/v1/tenant/*`）が subscription の実装後、AC-PLT-067 は契約一覧が subscription の実装後。

@@ -114,10 +114,13 @@ type AttemptStatus string
 
 // CommonProblem defines model for common_Problem.
 type CommonProblem struct {
-	Code          string  `json:"code"`
-	CorrelationId string  `json:"correlation_id"`
-	Detail        *string `json:"detail,omitempty"`
-	Errors        *[]struct {
+	Code          string `json:"code"`
+	CorrelationId string `json:"correlation_id"`
+
+	// DeclineCategory payment_declined のときだけ（card_expired / insufficient_funds / generic）
+	DeclineCategory *string `json:"decline_category,omitempty"`
+	Detail          *string `json:"detail,omitempty"`
+	Errors          *[]struct {
 		Code  string `json:"code"`
 		Field string `json:"field"`
 	} `json:"errors,omitempty"`

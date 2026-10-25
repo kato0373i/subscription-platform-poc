@@ -574,7 +574,8 @@ func (x *Subscription) ChangePaymentMethod(pm sk.PaymentMethodID) error {
 		return c.ErrStateConflict
 	}
 	x.s.PaymentMethodID = pm
-	x.emit(c.EventPaymentMethodChanged, map[string]any{"payment_method_id": pm})
+	// status は変更時点の契約の状態（Orchestration が past_due なら即時の再決済をする。orchestration.md §4.4・§4.10）
+	x.emit(c.EventPaymentMethodChanged, map[string]any{"payment_method_id": pm, "status": x.s.Status})
 	return nil
 }
 

@@ -104,6 +104,8 @@ export interface components {
             code: string;
             request_id: string;
             correlation_id: string;
+            /** @description payment_declined のときだけ（card_expired / insufficient_funds / generic） */
+            decline_category?: string;
             errors?: {
                 field: string;
                 code: string;

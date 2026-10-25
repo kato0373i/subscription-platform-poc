@@ -4,7 +4,7 @@ import { test, expect } from "../../fixtures/index.ts";
 
 type PaymentMethod = MePaymentsComponents["schemas"]["PaymentMethod"];
 
-const token = (scenario: string, last4 = "4242", exp = "1228") => `tok_stub_${scenario}_${last4}_${exp}_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
+const token = (scenario: string, last4 = "4242", exp = "1299") => `tok_stub_${scenario}_${last4}_${exp}_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}`;
 
 test("AC-PAY-001・002: トークンで登録すると表示用の情報だけが返り、同じ Idempotency-Key の再送は同じ支払方法", async ({ api, world, db }) => {
   const consumer = await world.createConsumer();
@@ -12,7 +12,7 @@ test("AC-PAY-001・002: トークンで登録すると表示用の情報だけ�
   const body = { method_type: "card", provider: "stub", token: token("ok") };
   const res = await api.call<PaymentMethod>("POST", "/v1/me/payment-methods", { token: consumer.token, idempotencyKey: key, body });
   expect(res.status, JSON.stringify(res.body)).toBe(201);
-  expect(res.body).toMatchObject({ method_type: "card", status: "active", expired: false, display: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2028 } });
+  expect(res.body).toMatchObject({ method_type: "card", status: "active", expired: false, display: { brand: "visa", last4: "4242", exp_month: 12, exp_year: 2099 } });
 
   const again = await api.call<PaymentMethod>("POST", "/v1/me/payment-methods", { token: consumer.token, idempotencyKey: key, body });
   expect(again.status).toBe(201);

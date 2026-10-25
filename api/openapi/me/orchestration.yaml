@@ -1,0 +1,131 @@
+# 契約者の申込・支払方法の変更と削除・退会（orchestration.md §4.1・§4.4・§4.5・§4.8・§7）。主体は consumer。
+openapi: 3.0.3
+info: {title: me-orchestration, version: "1"}
+paths:
+  /v1/me/subscriptions:
+    post:
+      operationId: meCreateSubscription
+      x-sp-idempotency: required
+      x-sp-isolation: not_applicable:creates the caller's own subscription (the plan's tenant is checked against tenant_id)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [tenant_id, plan_id, payment_method_id]
+              properties:
+                tenant_id: {type: string, format: uuid}
+                plan_id: {type: string, format: uuid}
+                payment_method_id: {type: string, format: uuid}
+                coupon_code: {type: string, minLength: 1, maxLength: 64}
+                expect_trial: {type: boolean}
+      responses:
+        "201":
+          description: 申込が成立した（trialing / active）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subscription, invoice]
+                properties:
+                  subscription: {$ref: '#/components/schemas/CheckoutSubscription'}
+                  invoice:
+                    type: object
+                    nullable: true
+                    required: [id, total, tax, status]
+                    properties:
+                      id: {type: string, format: uuid}
+                      total: {type: integer, format: int64}
+                      tax: {type: integer, format: int64}
+                      status: {type: string}
+        "202":
+          description: 決済の結果待ち（Location に契約の URL）
+          headers:
+            Location: {schema: {type: string}}
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subscription, processing]
+                properties:
+                  subscription:
+                    type: object
+                    required: [id, status]
+                    properties:
+                      id: {type: string, format: uuid}
+                      status: {type: string}
+                  processing: {type: boolean}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+        "422": {$ref: '../common.yaml#/components/responses/Problem'}
+        "503": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/me/subscriptions/{subscription_id}/payment-method:
+    put:
+      operationId: meChangeSubscriptionPaymentMethod
+      x-sp-isolation: tested
+      parameters:
+        - {name: subscription_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [payment_method_id]
+              properties:
+                payment_method_id: {type: string, format: uuid}
+      responses:
+        "200":
+          description: 変更後（支払い遅延中なら即時の再決済を依頼した）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [subscription_id, payment_method_id, status, recollection]
+                properties:
+                  subscription_id: {type: string, format: uuid}
+                  payment_method_id: {type: string, format: uuid}
+                  status: {type: string}
+                  recollection: {type: string, enum: [requested, none]}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+        "422": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/me/payment-methods/{payment_method_id}:
+    delete:
+      operationId: meDeletePaymentMethod
+      x-sp-isolation: tested
+      parameters:
+        - {name: payment_method_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "204": {description: 削除した、または削除済み}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/me:
+    delete:
+      operationId: meWithdraw
+      x-sp-isolation: not_applicable:withdraws the caller's own account only
+      responses:
+        "204": {description: 退会した}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    CheckoutSubscription:
+      type: object
+      required: [id, tenant_id, plan_id, status, trial_applied, trial_end, current_period, next_renewal_date]
+      properties:
+        id: {type: string, format: uuid}
+        tenant_id: {type: string, format: uuid}
+        plan_id: {type: string, format: uuid}
+        status: {type: string}
+        trial_applied: {type: boolean}
+        trial_end: {type: string, format: date, nullable: true}
+        current_period:
+          type: object
+          required: [start, end]
+          properties:
+            start: {type: string, format: date}
+            end: {type: string, format: date}
+        next_renewal_date: {type: string, format: date, nullable: true}

@@ -95,6 +95,20 @@ const (
 	InvoiceNotCollectible Code = "invoice_not_collectible"
 	// CollectionInProgress は この請求は決済の結果待ちです（409、owner: billing）。
 	CollectionInProgress Code = "collection_in_progress"
+	// PaymentMethodUnavailable は この支払方法は使えません（422、owner: orchestration）。
+	PaymentMethodUnavailable Code = "payment_method_unavailable"
+	// PaymentMethodReentryRequired は 支払方法をもう一度登録してください（422、owner: orchestration）。
+	PaymentMethodReentryRequired Code = "payment_method_reentry_required"
+	// PaymentDeclined は 決済できませんでした（422、owner: orchestration）。
+	PaymentDeclined Code = "payment_declined"
+	// SubscriptionNotModifiable は この契約は変更できません（409、owner: orchestration）。
+	SubscriptionNotModifiable Code = "subscription_not_modifiable"
+	// PaymentMethodInUse は この支払方法は契約で使われています（409、owner: orchestration）。
+	PaymentMethodInUse Code = "payment_method_in_use"
+	// HasOpenSubscriptions は 有効な契約があるため退会できません（409、owner: orchestration）。
+	HasOpenSubscriptions Code = "has_open_subscriptions"
+	// BillingRunInProgress は 同じ課金日の投入が実行中です（409、owner: orchestration）。
+	BillingRunInProgress Code = "billing_run_in_progress"
 )
 
 // Info はコードの HTTP ステータスと題名。
@@ -106,50 +120,57 @@ type Info struct {
 
 // All は全コードの情報。
 var All = map[Code]Info{
-	ValidationFailed:           {Status: 400, Title: "入力の形式が正しくありません", Owner: "platform"},
-	Unauthenticated:            {Status: 401, Title: "認証が必要です", Owner: "platform"},
-	Forbidden:                  {Status: 403, Title: "この操作は許可されていません", Owner: "platform"},
-	NotFound:                   {Status: 404, Title: "見つかりません", Owner: "platform"},
-	MethodNotAllowed:           {Status: 405, Title: "このメソッドは使えません", Owner: "platform"},
-	Conflict:                   {Status: 409, Title: "ほかの更新と競合しました", Owner: "platform"},
-	RequestInProgress:          {Status: 409, Title: "同じリクエストを処理中です", Owner: "platform"},
-	IdempotencyKeyReused:       {Status: 422, Title: "Idempotency-Key が別の内容で使われています", Owner: "platform"},
-	InternalError:              {Status: 500, Title: "内部エラーが発生しました", Owner: "platform"},
-	ServiceUnavailable:         {Status: 503, Title: "一時的に利用できません", Owner: "platform"},
-	ProviderUnavailable:        {Status: 503, Title: "決済代行が一時的に利用できません", Owner: "payments"},
-	ClockBackwardNotAllowed:    {Status: 422, Title: "業務時刻は戻せません", Owner: "platform"},
-	TenantNotActive:            {Status: 403, Title: "事業者が有効ではありません", Owner: "tenant"},
-	TenantStateConflict:        {Status: 409, Title: "事業者の状態がこの操作を許しません", Owner: "tenant"},
-	FincodeShopIdTaken:         {Status: 409, Title: "この fincode のショップ ID は使用されています", Owner: "tenant"},
-	StaffAlreadyExists:         {Status: 409, Title: "このスタッフは登録済みです", Owner: "tenant"},
-	LastOwnerRequired:          {Status: 409, Title: "オーナーを 0 名にすることはできません", Owner: "tenant"},
-	ApiKeyLimitExceeded:        {Status: 409, Title: "有効な API キーの上限に達しています", Owner: "tenant"},
-	AccountWithdrawn:           {Status: 403, Title: "退会済みのアカウントです", Owner: "customer"},
-	EmailUnverified:            {Status: 403, Title: "メールアドレスが確認されていません", Owner: "customer"},
-	EmailAlreadyRegistered:     {Status: 409, Title: "このメールアドレスは別のアカウントで登録済みです", Owner: "customer"},
-	PlanUnavailable:            {Status: 410, Title: "現在お申し込みいただけません", Owner: "catalog"},
-	PriceUnchanged:             {Status: 422, Title: "現在の価格と同じです", Owner: "catalog"},
-	CouponCodeTaken:            {Status: 409, Title: "このクーポンコードは使用されています", Owner: "catalog"},
-	CouponNotFound:             {Status: 422, Title: "クーポンが見つかりません", Owner: "catalog"},
-	CouponExpired:              {Status: 422, Title: "クーポンの有効期限が切れています", Owner: "catalog"},
-	CouponNotApplicable:        {Status: 422, Title: "このプランには使えないクーポンです", Owner: "catalog"},
-	CouponAlreadyUsed:          {Status: 422, Title: "このクーポンは使用済みです", Owner: "catalog"},
-	CouponExhausted:            {Status: 422, Title: "クーポンの利用上限に達しました", Owner: "catalog"},
-	SubscriptionTerminal:       {Status: 409, Title: "この契約は終了しています", Owner: "subscription"},
-	SubscriptionStateConflict:  {Status: 409, Title: "現在の契約の状態ではこの操作はできません", Owner: "subscription"},
-	CancellationScheduled:      {Status: 409, Title: "解約が予約されています", Owner: "subscription"},
-	CancellationNotRevocable:   {Status: 409, Title: "この解約予約は取り消せません", Owner: "subscription"},
-	PlanChangeNotAllowed:       {Status: 422, Title: "このプランには変更できません", Owner: "subscription"},
-	TrialNotEligible:           {Status: 422, Title: "このプランのトライアルは利用済みです", Owner: "subscription"},
-	PaymentMethodLimitExceeded: {Status: 422, Title: "登録できる支払方法の上限に達しています", Owner: "payments"},
-	InvalidPaymentToken:        {Status: 422, Title: "カード情報を確認できませんでした", Owner: "payments"},
-	UnsupportedPaymentMethod:   {Status: 422, Title: "この支払方法は使えません", Owner: "payments"},
-	AttemptAlreadyFinalized:    {Status: 409, Title: "この決済は確定済みです", Owner: "payments"},
-	AttemptNotResolvable:       {Status: 409, Title: "この決済はまだ手動で確定できません", Owner: "payments"},
-	OutcomeMismatch:            {Status: 409, Title: "決済代行の結果と指定が違います", Owner: "payments"},
-	PayableAlreadyPaid:         {Status: 409, Title: "この請求は支払い済みです", Owner: "payments"},
-	InvoiceNotCollectible:      {Status: 409, Title: "この請求は回収できません", Owner: "billing"},
-	CollectionInProgress:       {Status: 409, Title: "この請求は決済の結果待ちです", Owner: "billing"},
+	ValidationFailed:             {Status: 400, Title: "入力の形式が正しくありません", Owner: "platform"},
+	Unauthenticated:              {Status: 401, Title: "認証が必要です", Owner: "platform"},
+	Forbidden:                    {Status: 403, Title: "この操作は許可されていません", Owner: "platform"},
+	NotFound:                     {Status: 404, Title: "見つかりません", Owner: "platform"},
+	MethodNotAllowed:             {Status: 405, Title: "このメソッドは使えません", Owner: "platform"},
+	Conflict:                     {Status: 409, Title: "ほかの更新と競合しました", Owner: "platform"},
+	RequestInProgress:            {Status: 409, Title: "同じリクエストを処理中です", Owner: "platform"},
+	IdempotencyKeyReused:         {Status: 422, Title: "Idempotency-Key が別の内容で使われています", Owner: "platform"},
+	InternalError:                {Status: 500, Title: "内部エラーが発生しました", Owner: "platform"},
+	ServiceUnavailable:           {Status: 503, Title: "一時的に利用できません", Owner: "platform"},
+	ProviderUnavailable:          {Status: 503, Title: "決済代行が一時的に利用できません", Owner: "payments"},
+	ClockBackwardNotAllowed:      {Status: 422, Title: "業務時刻は戻せません", Owner: "platform"},
+	TenantNotActive:              {Status: 403, Title: "事業者が有効ではありません", Owner: "tenant"},
+	TenantStateConflict:          {Status: 409, Title: "事業者の状態がこの操作を許しません", Owner: "tenant"},
+	FincodeShopIdTaken:           {Status: 409, Title: "この fincode のショップ ID は使用されています", Owner: "tenant"},
+	StaffAlreadyExists:           {Status: 409, Title: "このスタッフは登録済みです", Owner: "tenant"},
+	LastOwnerRequired:            {Status: 409, Title: "オーナーを 0 名にすることはできません", Owner: "tenant"},
+	ApiKeyLimitExceeded:          {Status: 409, Title: "有効な API キーの上限に達しています", Owner: "tenant"},
+	AccountWithdrawn:             {Status: 403, Title: "退会済みのアカウントです", Owner: "customer"},
+	EmailUnverified:              {Status: 403, Title: "メールアドレスが確認されていません", Owner: "customer"},
+	EmailAlreadyRegistered:       {Status: 409, Title: "このメールアドレスは別のアカウントで登録済みです", Owner: "customer"},
+	PlanUnavailable:              {Status: 410, Title: "現在お申し込みいただけません", Owner: "catalog"},
+	PriceUnchanged:               {Status: 422, Title: "現在の価格と同じです", Owner: "catalog"},
+	CouponCodeTaken:              {Status: 409, Title: "このクーポンコードは使用されています", Owner: "catalog"},
+	CouponNotFound:               {Status: 422, Title: "クーポンが見つかりません", Owner: "catalog"},
+	CouponExpired:                {Status: 422, Title: "クーポンの有効期限が切れています", Owner: "catalog"},
+	CouponNotApplicable:          {Status: 422, Title: "このプランには使えないクーポンです", Owner: "catalog"},
+	CouponAlreadyUsed:            {Status: 422, Title: "このクーポンは使用済みです", Owner: "catalog"},
+	CouponExhausted:              {Status: 422, Title: "クーポンの利用上限に達しました", Owner: "catalog"},
+	SubscriptionTerminal:         {Status: 409, Title: "この契約は終了しています", Owner: "subscription"},
+	SubscriptionStateConflict:    {Status: 409, Title: "現在の契約の状態ではこの操作はできません", Owner: "subscription"},
+	CancellationScheduled:        {Status: 409, Title: "解約が予約されています", Owner: "subscription"},
+	CancellationNotRevocable:     {Status: 409, Title: "この解約予約は取り消せません", Owner: "subscription"},
+	PlanChangeNotAllowed:         {Status: 422, Title: "このプランには変更できません", Owner: "subscription"},
+	TrialNotEligible:             {Status: 422, Title: "このプランのトライアルは利用済みです", Owner: "subscription"},
+	PaymentMethodLimitExceeded:   {Status: 422, Title: "登録できる支払方法の上限に達しています", Owner: "payments"},
+	InvalidPaymentToken:          {Status: 422, Title: "カード情報を確認できませんでした", Owner: "payments"},
+	UnsupportedPaymentMethod:     {Status: 422, Title: "この支払方法は使えません", Owner: "payments"},
+	AttemptAlreadyFinalized:      {Status: 409, Title: "この決済は確定済みです", Owner: "payments"},
+	AttemptNotResolvable:         {Status: 409, Title: "この決済はまだ手動で確定できません", Owner: "payments"},
+	OutcomeMismatch:              {Status: 409, Title: "決済代行の結果と指定が違います", Owner: "payments"},
+	PayableAlreadyPaid:           {Status: 409, Title: "この請求は支払い済みです", Owner: "payments"},
+	InvoiceNotCollectible:        {Status: 409, Title: "この請求は回収できません", Owner: "billing"},
+	CollectionInProgress:         {Status: 409, Title: "この請求は決済の結果待ちです", Owner: "billing"},
+	PaymentMethodUnavailable:     {Status: 422, Title: "この支払方法は使えません", Owner: "orchestration"},
+	PaymentMethodReentryRequired: {Status: 422, Title: "支払方法をもう一度登録してください", Owner: "orchestration"},
+	PaymentDeclined:              {Status: 422, Title: "決済できませんでした", Owner: "orchestration"},
+	SubscriptionNotModifiable:    {Status: 409, Title: "この契約は変更できません", Owner: "orchestration"},
+	PaymentMethodInUse:           {Status: 409, Title: "この支払方法は契約で使われています", Owner: "orchestration"},
+	HasOpenSubscriptions:         {Status: 409, Title: "有効な契約があるため退会できません", Owner: "orchestration"},
+	BillingRunInProgress:         {Status: 409, Title: "同じ課金日の投入が実行中です", Owner: "orchestration"},
 }
 
 // Status はコードの HTTP ステータス（未登録なら 500）。

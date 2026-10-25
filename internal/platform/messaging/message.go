@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	sk "subscription-platform/internal/sharedkernel"
 )
@@ -47,6 +48,33 @@ type Message struct {
 // Outcome は Dispatch の結果。
 type Outcome struct {
 	Succeeded, Retry, Permanent []Message
+	// Delay は RetryAfter で再配信までの時間を指定したメッセージ（ID → 時間）。なければ受信回数による既定の間隔。
+	Delay map[string]time.Duration
+}
+
+type retryAfterError struct {
+	err   error
+	delay time.Duration
+}
+
+func (r retryAfterError) Error() string { return fmt.Sprintf("retry after %s: %v", r.delay, r.err) }
+func (r retryAfterError) Unwrap() error { return r.err }
+
+// RetryAfter は消さずに残し、delay 後に再配信させる（例：同じ契約に進行中のプロセスがあるので 60 秒後。orchestration.md §2）。
+func RetryAfter(err error, delay time.Duration) error {
+	if err == nil {
+		return nil
+	}
+	return retryAfterError{err: err, delay: delay}
+}
+
+// RetryDelay は RetryAfter で指定した時間。指定がなければ 0。
+func RetryDelay(err error) time.Duration {
+	var r retryAfterError
+	if errors.As(err, &r) {
+		return r.delay
+	}
+	return 0
 }
 
 type permanentError struct{ err error }

@@ -15,6 +15,7 @@ components:
         code: {type: string}
         request_id: {type: string}
         correlation_id: {type: string}
+        decline_category: {type: string, description: payment_declined のときだけ（card_expired / insufficient_funds / generic）}
         errors:
           type: array
           items:

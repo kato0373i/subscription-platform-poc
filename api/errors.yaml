@@ -221,3 +221,38 @@ codes:
     title: この請求は決済の結果待ちです
     owner: billing
     description: processing / payment_unknown の請求に回収を要求した（先に試行を確定させる）
+  - code: payment_method_unavailable
+    status: 422
+    title: この支払方法は使えません
+    owner: orchestration
+    description: 本人のものでない・削除済みの支払方法で申込・変更した
+  - code: payment_method_reentry_required
+    status: 422
+    title: 支払方法をもう一度登録してください
+    owner: orchestration
+    description: 事業者ショップ向けの参照を作れない（P-PAY-1）
+  - code: payment_declined
+    status: 422
+    title: 決済できませんでした
+    owner: orchestration
+    description: 初回の決済が拒否された。decline_category（card_expired / insufficient_funds / generic）を付ける
+  - code: subscription_not_modifiable
+    status: 409
+    title: この契約は変更できません
+    owner: orchestration
+    description: 終端（canceled / signup_failed）または申込の処理中の契約の支払方法を変えようとした
+  - code: payment_method_in_use
+    status: 409
+    title: この支払方法は契約で使われています
+    owner: orchestration
+    description: 有効な契約（pending_initial を含む）で使用中の支払方法を削除しようとした
+  - code: has_open_subscriptions
+    status: 409
+    title: 有効な契約があるため退会できません
+    owner: orchestration
+    description: 解約予約中を含む有効な契約がある（D-05）
+  - code: billing_run_in_progress
+    status: 409
+    title: 同じ課金日の投入が実行中です
+    owner: orchestration
+    description: 同じ課金日の BillingRun が dispatching

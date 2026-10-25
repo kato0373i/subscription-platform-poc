@@ -24,6 +24,31 @@ queues:
     concurrency: 2
     visibility_timeout_s: 300
     max_receive: 3
+  # Orchestration（orchestration.md §5・§8）。回収の collection_due だけ専用のキュー（P-ARC-7）。
+  # 「同じ契約に進行中のプロセスがある」ときは 60 秒後に再配信するので、max_receive は 10（P-IMP-17）
+  - name: orc-events
+    process: worker-billing
+    consumer: orchestration.events
+    events: [billing.invoice_paid, billing.invoice_payment_failed, billing.invoice_marked_uncollectible, subscription.payment_method_changed, subscription.canceled, tenant.suspended]
+    concurrency: 10
+    visibility_timeout_s: 60
+    max_receive: 10
+  # fincode への流量の上限 = concurrency × worker-billing のタスク数の上限（P-ARC-11 ②）
+  - name: orc-collection
+    process: worker-billing
+    consumer: orchestration.collection
+    events: [billing.invoice_collection_due]
+    concurrency: 5
+    visibility_timeout_s: 60
+    max_receive: 10
+  # 更新処理の投入（C-01。renewal-dispatch が SDK で直接送る）
+  - name: orc-renewal.fifo
+    process: worker-billing
+    consumer: orchestration.renewal
+    fifo: true
+    concurrency: 10
+    visibility_timeout_s: 60
+    max_receive: 10
   # 決済の結果を請求に反映する（billing.md §5）
   - name: billing-payments
     process: worker-billing

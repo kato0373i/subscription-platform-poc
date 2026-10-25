@@ -69,6 +69,12 @@ func WithSystemScope(ctx context.Context, reason string) context.Context {
 	return context.WithValue(ctx, scopeKey{}, s)
 }
 
+// ClearScope はスコープを外す。他モジュールの contracts を順に呼ぶ Orchestration が、自分の表を触るときだけスコープを付け直すために使う
+// （contracts は自分でスコープを決めるので、呼び出し元の tenant / customer スコープを引き継ぐと system スコープと衝突する）。
+func ClearScope(ctx context.Context) context.Context {
+	return context.WithValue(ctx, scopeKey{}, Scope{})
+}
+
 // WithUnscoped は主体を確定する前の処理（API キーの認証・初回ログインのアカウント作成）だけが使う。
 // RLS を越えない sp_<m> で動くので、RLS のある表は読めない。必要な行は SECURITY DEFINER 関数か RLS のない表から読む。
 func WithUnscoped(ctx context.Context, reason string) context.Context {

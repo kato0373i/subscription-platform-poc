@@ -347,6 +347,19 @@ func (s *Service) GetOpenInvoice(ctx context.Context, sub sk.SubscriptionID) (*c
 	return out, err
 }
 
+// GetInvoice は ID で請求を読む（contracts。事業者を引いてからテナントのスコープで読む）。
+func (s *Service) GetInvoice(ctx context.Context, id sk.InvoiceID) (c.InvoiceView, error) {
+	tenant, err := s.invoiceTenant(ctx, id)
+	if err != nil {
+		return c.InvoiceView{}, err
+	}
+	st, err := s.GetInvoiceState(db.WithTenantScope(ctx, tenant), id)
+	if err != nil {
+		return c.InvoiceView{}, err
+	}
+	return domain.Restore(st).View(), nil
+}
+
 // ---- API 用 ----
 
 // ListInvoices は ctx のスコープ（tenant または customer）で見える契約の請求の一覧（limit+1 件読んで続きの有無を返す）。
@@ -371,8 +384,8 @@ func (s *Service) ListInvoices(ctx context.Context, sub sk.SubscriptionID, p pos
 	return out, more, err
 }
 
-// GetInvoice は ctx のスコープで請求を読む。見えなければ ErrInvoiceNotFound。
-func (s *Service) GetInvoice(ctx context.Context, id sk.InvoiceID) (domain.State, error) {
+// GetInvoiceState は ctx のスコープで請求を読む。見えなければ ErrInvoiceNotFound。
+func (s *Service) GetInvoiceState(ctx context.Context, id sk.InvoiceID) (domain.State, error) {
 	var st domain.State
 	err := s.d.DB.ReadTx(ctx, func(ctx context.Context, tx db.Tx) error {
 		x, err := postgres.New(tx).Get(ctx, id)
@@ -391,7 +404,7 @@ func (s *Service) OpsCollect(ctx context.Context, id sk.InvoiceID, operator, not
 	if err != nil {
 		return c.InvoiceView{}, time.Time{}, err
 	}
-	st, err := s.GetInvoice(db.WithTenantScope(ctx, v.TenantID), id)
+	st, err := s.GetInvoiceState(db.WithTenantScope(ctx, v.TenantID), id)
 	if err != nil {
 		return c.InvoiceView{}, time.Time{}, err
 	}

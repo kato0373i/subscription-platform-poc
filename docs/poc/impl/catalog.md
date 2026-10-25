@@ -42,8 +42,8 @@
 | 012・034 | ✅ | `authorization.spec.ts`・`tenant-isolation.spec.ts` |
 | 016・017 | ✅ | `coupons.spec.ts`・`coupon-preview.spec.ts` |
 | 019 | 一部 ✅ | 期限切れ（`coupon-validation.clock.spec.ts`）、対象外・無効化（`coupon-preview.spec.ts`）。上限到達と申込 API での確認は orchestration の実装後 |
-| 020 | ⏳ orchestration | 使用済みにするには申込での確定が要る。`CustomerHoldsCoupon` による判定は結合テスト（`TestSameCustomer`）で確かめている |
-| 024・025・030・031・033 | ⏳ orchestration・payments | 申込を通した予約・確定・解放。contracts 側は結合テストで確かめている |
+| 020 | ✅ | E2E-003・017 |
+| 024・025・030・031・033 | ✅ | `e2e/tests/orchestration/checkout-coupon.spec.ts`・`checkout-declined.spec.ts`、E2E-017・003 |
 | 027 | 一部 ✅ | 掃除ジョブの解放・二重に戻さないこと・解放イベントは結合テスト（`TestLateConfirm`）。申込で結果不明にした E2E（`coupon-reservation-sweep.clock.spec.ts`）は orchestration・payments の実装後 |
 | 032 | 一部 ✅ | EventEnvelope の actor は `audit.spec.ts`。監査記録の DB 確認は audit の実装後 |
 

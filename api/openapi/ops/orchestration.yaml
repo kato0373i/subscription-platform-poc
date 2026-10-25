@@ -1,0 +1,128 @@
+# 運営者の課金バッチの再実行・照会と一括解約の照会（orchestration.md §7.5〜§7.7）。主体は operator。
+openapi: 3.0.3
+info: {title: ops-orchestration, version: "1"}
+paths:
+  /v1/ops/billing-runs/{run_date}/rerun:
+    post:
+      operationId: opsRerunBillingRun
+      parameters:
+        - {$ref: '#/components/parameters/RunDate'}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                tenant_id: {type: string, format: uuid}
+      responses:
+        "202":
+          description: 再実行を受け付けた（投入は worker-billing が行う）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [billing_run_id, run_date, seq, trigger, status]
+                properties:
+                  billing_run_id: {type: string, format: uuid}
+                  run_date: {type: string, format: date}
+                  seq: {type: integer}
+                  trigger: {type: string}
+                  status: {type: string}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/billing-runs/{run_date}:
+    get:
+      operationId: opsGetBillingRuns
+      parameters:
+        - {$ref: '#/components/parameters/RunDate'}
+      responses:
+        "200":
+          description: 課金日の投入の記録と、更新のプロセスの結果の集計
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run_date, runs, outcomes]
+                properties:
+                  run_date: {type: string, format: date}
+                  runs:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, seq, trigger, status, enqueued_count, resume_count, started_at, finished_at]
+                      properties:
+                        id: {type: string, format: uuid}
+                        seq: {type: integer}
+                        trigger: {type: string}
+                        status: {type: string}
+                        enqueued_count: {type: integer}
+                        resume_count: {type: integer}
+                        started_at: {type: string, format: date-time}
+                        finished_at: {type: string, format: date-time, nullable: true}
+                  outcomes:
+                    type: object
+                    required: [paid, payment_failed, ended, in_progress, failed]
+                    properties:
+                      paid: {type: integer}
+                      payment_failed: {type: integer}
+                      ended: {type: integer}
+                      in_progress: {type: integer}
+                      failed: {type: integer}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/bulk-cancellation-jobs:
+    get:
+      operationId: opsListBulkCancellationJobs
+      parameters:
+        - {name: tenant_id, in: query, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200":
+          description: 事業者の一括解約のジョブ（新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/BulkJob'}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/bulk-cancellation-jobs/{job_id}:
+    get:
+      operationId: opsGetBulkCancellationJob
+      parameters:
+        - {name: job_id, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        "200": {description: ジョブ, content: {application/json: {schema: {$ref: '#/components/schemas/BulkJob'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    RunDate: {name: run_date, in: path, required: true, schema: {type: string, format: date}}
+  schemas:
+    BulkJob:
+      type: object
+      required: [id, tenant_id, status, sweep_round, counts, failures, started_at, completed_at]
+      properties:
+        id: {type: string, format: uuid}
+        tenant_id: {type: string, format: uuid}
+        status: {type: string, enum: [running, completed]}
+        sweep_round: {type: integer}
+        counts:
+          type: object
+          required: [processed, scheduled_at_period_end, canceled_immediately, skipped, failed]
+          properties:
+            processed: {type: integer}
+            scheduled_at_period_end: {type: integer}
+            canceled_immediately: {type: integer}
+            skipped: {type: integer}
+            failed: {type: integer}
+        failures:
+          type: array
+          items:
+            type: object
+            required: [subscription_id, error]
+            properties:
+              subscription_id: {type: string, format: uuid}
+              error: {type: string}
+        started_at: {type: string, format: date-time}
+        completed_at: {type: string, format: date-time, nullable: true}

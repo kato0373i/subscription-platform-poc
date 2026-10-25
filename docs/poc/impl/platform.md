@@ -38,7 +38,7 @@
 | 037・038・062・065 | ✅ | `internal/platform/scheduler/integration_test.go` |
 | 039〜041 | ✅ | `e2e/tests/platform/dev-clock.clock.spec.ts`（ジョブは `platform-noop`） |
 | 042 | ✅ | `cmd/internal/wiring/devtools_off_test.go`、`internal/platform/config/config_test.go` |
-| 043 | ⏳ orchestration | 相関 ID の引き継ぎ（API → Outbox → 購読者）は `smoke`・`dev-clock` の E2E と結合テストで確かめている。申込での確認は orchestration の実装後 |
+| 043 | 一部 ✅ | 相関 ID の引き継ぎ（API → Outbox → 購読者）は `smoke`・`dev-clock` の E2E と結合テスト。申込の相関 ID を購読者まで追う E2E は未作成 |
 | 044・045・075・080・084 | ✅ | `internal/platform/observability`・`config` の UT |
 | 046 | ✅ | `e2e/tests/platform/smoke.spec.ts`、`task verify:local`（何もない状態からの `task up` で確かめた） |
 | 047 | ✅ | `task verify:fallback`（direct）、`DB_MODE=container task up` で E2E を通した |

@@ -6,6 +6,7 @@ import (
 	billingdb "subscription-platform/modules/billing/db"
 	catalogdb "subscription-platform/modules/catalog/db"
 	customerdb "subscription-platform/modules/customer/db"
+	orchestrationdb "subscription-platform/modules/orchestration/db"
 	paymentsdb "subscription-platform/modules/payments/db"
 	subscriptiondb "subscription-platform/modules/subscription/db"
 	tenantdb "subscription-platform/modules/tenant/db"
@@ -22,6 +23,7 @@ func MigrationSources() []migrate.Source {
 		{Schema: "subscription", FS: migrate.SubFS(subscriptiondb.Migrations, "migrations")},
 		{Schema: "billing", FS: migrate.SubFS(billingdb.Migrations, "migrations")},
 		{Schema: "payments", FS: migrate.SubFS(paymentsdb.Migrations, "migrations")},
+		{Schema: "orchestration", FS: migrate.SubFS(orchestrationdb.Migrations, "migrations")},
 	}, devMigrationSources()...)
 }
 

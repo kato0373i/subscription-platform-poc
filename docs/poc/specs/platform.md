@@ -1035,3 +1035,4 @@ e2e/
 | 2026-10-24 | catalog の実装時の決定を反映（P-IMP-12）：sharedkernel に `SubscriptionID`、`/v1/checkout/*` の任意の認証（consumer のトークンがあれば主体を置く）、監査注釈の安全網の例外（`product_name`・`plan_name`・`coupon_name`）、archtest の結合テストの例外、設定 `CATALOG_COUPON_RESERVATION_TTL` | PdM |
 | 2026-10-24 | subscription の実装時の決定を反映（P-IMP-14）：モジュールをまたぐ ID を sharedkernel に追加、`scheduler.Stats` を `map[string]any` に、一括シード（§7.3）を段階 1（payments・billing の前。支払方法と初回の請求は合成 ID）で実装 | PdM |
 | 2026-10-25 | payments の実装時の決定を反映（P-IMP-15）：`migrate.Source.Table`（devtools だけのマイグレーションのバージョン表）、設定 `PAYMENTS_METHODS`・`STUB_WEBHOOK_SECRET`・`FINCODE_*`、sharedkernel に `PaymentAttemptID`、一括シードの段階 2 の前半（支払方法の登録と初回の決済） | PdM |
+| 2026-10-25 | orchestration の実装（P-IMP-17）を反映：`db.ClearScope`、`inbox.Guard`（処理の後に記録）、`messaging.RetryAfter`（固定の時間の再配信）、`SQSCommandSender.SendFIFOBatch`、Problem の任意項目 `decline_category`、ローカルの `BILLING_COLLECTION_LEASE=1m`、dev clock の読み直しを裏のループにする（`Now()` が DB の接続を待ってデッドロックした不具合の修正） | PdM |

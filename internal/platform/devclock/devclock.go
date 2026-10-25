@@ -1,7 +1,7 @@
 //go:build devtools
 
 // Package devclock はローカルの業務時刻（実時刻 + offset）を持つ。devtools ビルドだけに含める（憲章 §5、P-ARC-8）。
-// offset は platform.dev_clock に 1 行。プロセスごとに 1 秒キャッシュして読む（LISTEN と ack はしない）。
+// offset は platform.dev_clock に 1 行。プロセスごとに裏のループで 250ms ごとに読み直す（LISTEN と ack はしない）。
 package devclock
 
 import (
@@ -30,6 +30,7 @@ type Clock struct {
 	platform *db.ModuleDB
 	real     func() time.Time
 
+	once     sync.Once
 	mu       sync.Mutex
 	offset   time.Duration
 	version  int64
@@ -47,12 +48,13 @@ type State struct {
 	EffectiveAfter *time.Time `json:"effective_after,omitempty"`
 }
 
-func (c *Clock) refresh(ctx context.Context) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if !c.loadedAt.IsZero() && c.real().Sub(c.loadedAt) < CacheTTL {
-		return
-	}
+// refreshInterval は裏のループが offset を読み直す間隔（CacheTTL より短くして、書き込みから 1 秒以内に反映する）。
+const refreshInterval = 250 * time.Millisecond
+
+// load は platform.dev_clock を読む。呼び出し元を待たせないよう、接続の取得を含めて短い期限を付ける。
+func (c *Clock) load(ctx context.Context) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
 	var offMs, ver int64
 	err := c.platform.ReadTx(db.WithSystemScope(ctx, "devclock"), func(ctx context.Context, tx db.Tx) error {
 		err := tx.QueryRow(ctx, `SELECT offset_ms, version FROM platform.dev_clock WHERE id = 1`).Scan(&offMs, &ver)
@@ -65,7 +67,24 @@ func (c *Clock) refresh(ctx context.Context) {
 		observability.Logger("platform.devclock").LogAttrs(ctx, slog.LevelWarn, "devclock.read_failed", observability.Err(err))
 		return // 前の値を使い続ける
 	}
+	c.mu.Lock()
 	c.offset, c.version, c.loadedAt = time.Duration(offMs)*time.Millisecond, ver, c.real()
+	c.mu.Unlock()
+}
+
+// refresh は初回だけ同期で読み、以後は裏のループに任せる。Now() は DB の接続を待たない
+// （トランザクションの中から Now() を呼ぶので、接続を待つとプールを使い切ったときにデッドロックする）。
+func (c *Clock) refresh(ctx context.Context) {
+	c.once.Do(func() {
+		c.load(ctx)
+		go func() {
+			t := time.NewTicker(refreshInterval)
+			defer t.Stop()
+			for range t.C {
+				c.load(context.Background())
+			}
+		}()
+	})
 }
 
 // Now は業務時刻（UTC）。

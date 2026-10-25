@@ -71,7 +71,7 @@ export function createWorld(api: Api, tokens: Tokens, wait: Wait, testTag: strin
       return { token: t.token, sub: t.sub, email: t.email, customerAccountId: me.body.id };
     },
     async createPaymentMethod(consumer, scenario = "ok") {
-      const token = `tok_stub_${scenario}_4242_1230_${Math.random().toString(36).slice(2, 10).padEnd(8, "0")}`;
+      const token = `tok_stub_${scenario}_4242_1299_${Math.random().toString(36).slice(2, 10).padEnd(8, "0")}`;
       const res = await api.call<{ id: string }>("POST", "/v1/me/payment-methods", {
         token: consumer.token,
         idempotencyKey: `pm-${testTag}-${++seq}`,

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/google/uuid"
+
 	"subscription-platform/internal/platform/config"
 	"subscription-platform/internal/platform/httpx"
 	"subscription-platform/internal/platform/messaging"
@@ -17,6 +19,7 @@ import (
 	catalogcontracts "subscription-platform/modules/catalog/contracts"
 	"subscription-platform/modules/customer"
 	customercontracts "subscription-platform/modules/customer/contracts"
+	"subscription-platform/modules/orchestration"
 	"subscription-platform/modules/payments"
 	paymentscontracts "subscription-platform/modules/payments/contracts"
 	"subscription-platform/modules/subscription"
@@ -67,6 +70,19 @@ func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 	if err != nil {
 		return nil, err
 	}
+	fifo := messaging.NewSQSCommandSender(b.SQS, b.Cfg.QueueURLPrefix)
+	sched := b.SchedulerService()
+	orc := orchestration.New(orchestration.Deps{
+		Pool: b.Pool, Clock: b.Clock, Tenant: t.Service(), Customer: c.Service(), Catalog: cat.Service(), Subscription: sub.Service(),
+		Billing: bil.Service(), Payments: pay.Service(),
+		SendRenewal: func(ctx context.Context, msgs []messaging.FIFOMessage) error {
+			return fifo.SendFIFOBatch(ctx, "orc-renewal.fifo", msgs)
+		},
+		EnqueueJob: func(ctx context.Context, job string, asOf sk.Date, params []byte) (uuid.UUID, error) {
+			res, err := sched.Enqueue(ctx, job, scheduler.EnqueueOptions{Trigger: scheduler.TriggerOps, AsOf: &asOf, Params: params, Force: true})
+			return res.RunID, err
+		},
+	})
 	b.Services = Services{Tenant: t.Service(), Customer: c.Service(), Catalog: cat.Service(), Subscription: sub.Service(), Billing: bil.Service(), Payments: pay.Service()}
 	b.devMounts = append(b.devMounts, pay.MountDev)
 	return []ModuleSet{
@@ -76,6 +92,7 @@ func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 		{Name: subscription.Name, HasOutbox: true, MountHTTP: sub.MountHTTP, Jobs: sub.Jobs()},
 		{Name: billing.Name, HasOutbox: true, MountHTTP: bil.MountHTTP, Consumers: bil.Consumers(), Jobs: bil.Jobs()},
 		{Name: payments.Name, HasOutbox: true, MountHTTP: pay.MountHTTP, Consumers: pay.Consumers(), Jobs: pay.Jobs()},
+		{Name: orchestration.Name, HasOutbox: true, MountHTTP: orc.MountHTTP, Consumers: orc.Consumers(), Jobs: orc.Jobs()},
 	}, nil
 }
 
