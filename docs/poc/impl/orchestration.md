@@ -48,6 +48,12 @@
 | webhook-sink の確認・E2E-015 | ✅ | E2E-001（W1 への配信と `cus_`）・E2E-019（payment_method_changed が届かない）・E2E-015（integration の実装で追加。`docs/poc/impl/integration.md`） |
 | E2E-014 の worker-billing の停止 | ⏳ procs fixture | 再開の正しさは結合テスト（AC-ORC-047・048） |
 
+## 4. 他の TL への引き継ぎ
+
+- **TL-Integration**：Orchestration はイベントを出さない（Outbox は拡張口）。契約・請求のイベントは各モジュールが出す。E2E の sink の確認は各シナリオに「integration モジュールの実装後」とコメントしてある箇所に足す。
+- **TL-Audit**：注釈 `billing_run.rerun`（run_date・billing_run_id・seq・tenant_id）を書いている。
+- **E2E**：`e2e/helpers/orchestration.ts` に申込（`checkout`・`subscribe`）、StubAdapter の上書き（`setBehavior`）、clock の基準日（`startAtNext15`）、DB の共通の確認（`expectInvariants`）がある。ジョブ名は `JOB.*`。
+
 ## 5. E2E-020 の計測結果（2026-10-25、コミット 6ba851e）
 
 ローカル（MacBook の Docker、MiniStack、worker-billing 1 タスク、`orc-renewal.fifo` の同時実行 10・`orc-collection` 5、StubAdapter の遅延 0）。処理時間は参考値で、本番相当の値は dev 環境（AWS）で取る（D-07・P-ARC-9）。
@@ -61,9 +67,3 @@
 - リース 1 分では、キューで 1 分以上待った請求が毎時の `billing-collection-due` で同じ collection_seq のまま再送され（同じ回収キーなので二重課金にはならない）、「進行中のプロセスがある」として 60 秒後に回されるので、途中で約 60 秒止まった。リースは回収キューの待ち時間より長くする必要がある（本番の 6h は十分）。
 - 1 分のリースのときの段階ごとの内訳：投入ジョブ（1 万件の FIFO 送信）約 66 秒、請求の発行 約 15.6 件/秒（いちばん遅い段階。`orc-renewal.fifo` の同時実行 10）、Outbox の中継の遅れは最大 111 秒。
 - 計測の手順：本番相当で測るときは `.env.container` の `BILLING_COLLECTION_LEASE` を `6h` にしてプロセスを起動し直し、`cd e2e && E2E_PERF_COUNT=10000 pnpm e2e:perf`。結果は `e2e/test-results/e2e-020-result.json`（推移を含む）に残る。終わったら `./scripts/local-env.sh` で戻す。
-
-## 4. 他の TL への引き継ぎ
-
-- **TL-Integration**：Orchestration はイベントを出さない（Outbox は拡張口）。契約・請求のイベントは各モジュールが出す。E2E の sink の確認は各シナリオに「integration モジュールの実装後」とコメントしてある箇所に足す。
-- **TL-Audit**：注釈 `billing_run.rerun`（run_date・billing_run_id・seq・tenant_id）を書いている。
-- **E2E**：`e2e/helpers/orchestration.ts` に申込（`checkout`・`subscribe`）、StubAdapter の上書き（`setBehavior`）、clock の基準日（`startAtNext15`）、DB の共通の確認（`expectInvariants`）がある。ジョブ名は `JOB.*`。
