@@ -41,6 +41,9 @@ tasks:
   dev:container:
     desc: 3 プロセスを compose の profile app で起動する（CI と同じ）
     cmds:
+      # コンテナは nonroot（uid 65532）で .local/logs に書く。Linux（CI）ではバインドマウントの権限がそのまま効くので、
+      # ローカル専用のログ置き場を誰でも書けるようにしておく（macOS の Docker Desktop では不要だが害もない）
+      - mkdir -p .local/logs && chmod a+rwx .local/logs && (chmod a+rw .local/logs/*.jsonl 2>/dev/null || true)
       - docker compose --profile app up -d --build --wait api worker-billing worker-integration
       - ./scripts/wait-ready.sh
 
