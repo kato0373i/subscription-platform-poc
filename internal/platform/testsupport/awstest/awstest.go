@@ -192,6 +192,18 @@ func Drain(t testing.TB, url string) []string {
 	return bodies
 }
 
+// DrainAtLeast は want 件そろうか timeout が過ぎるまで受信して消す（EventBridge → SQS の配送は非同期で、
+// 負荷の高い CI では Drain の「2 回続けて空」より遅れて届くことがある）。want 件を超えて届いた分も返す。
+func DrainAtLeast(t testing.TB, url string, want int, timeout time.Duration) []string {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	var bodies []string
+	for len(bodies) < want && time.Now().Before(deadline) {
+		bodies = append(bodies, Drain(t, url)...)
+	}
+	return append(bodies, Drain(t, url)...) // 遅れて届いた重複も数える
+}
+
 // ApproxCount はキューの見えているメッセージ数と処理中の数。
 func ApproxCount(t testing.TB, url string) (visible, inFlight int) {
 	t.Helper()

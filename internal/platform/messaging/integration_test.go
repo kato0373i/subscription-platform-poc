@@ -132,7 +132,7 @@ func TestRelaySkipLockedDeliversAllOnce(t *testing.T) {
 	cancel()
 	wg.Wait()
 	seen := map[string]int{}
-	for _, b := range awstest.Drain(t, url) {
+	for _, b := range awstest.DrainAtLeast(t, url, 1002, 60*time.Second) {
 		env, err := messaging.DecodeBody(b)
 		if err != nil {
 			t.Fatal(err)
