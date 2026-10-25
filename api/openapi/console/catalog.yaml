@@ -58,6 +58,7 @@ paths:
       x-sp-isolation: tested
       parameters:
         - {$ref: '#/components/parameters/ProductIDPath'}
+        - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
         required: true
         content:
@@ -135,6 +136,7 @@ paths:
       x-sp-isolation: tested
       parameters:
         - {$ref: '#/components/parameters/PlanIDPath'}
+        - {$ref: '#/components/parameters/IfMatch'}
       requestBody:
         required: true
         content:
@@ -299,14 +301,16 @@ components:
     ProductIDPath: {name: product_id, in: path, required: true, schema: {type: string, format: uuid}}
     PlanIDPath: {name: plan_id, in: path, required: true, schema: {type: string, format: uuid}}
     CouponIDPath: {name: coupon_id, in: path, required: true, schema: {type: string, format: uuid}}
+    IfMatch: {name: If-Match, in: header, description: 楽観ロック（version。business-console FR-015）, schema: {type: string}}
   schemas:
     Product:
       type: object
-      required: [id, name, description, created_at, updated_at]
+      required: [id, name, description, version, created_at, updated_at]
       properties:
         id: {type: string, format: uuid}
         name: {type: string}
         description: {type: string}
+        version: {type: integer}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
     PlanStatus: {type: string, enum: [draft, published, unpublished]}
@@ -321,7 +325,7 @@ components:
         effective_from: {type: string, format: date-time}
     Plan:
       type: object
-      required: [id, product_id, name, description, billing_interval, trial_days, pricing_scheme, status, current_price, published_at, created_at, updated_at]
+      required: [id, product_id, name, description, billing_interval, trial_days, pricing_scheme, status, current_price, published_at, version, created_at, updated_at]
       properties:
         id: {type: string, format: uuid}
         product_id: {type: string, format: uuid}
@@ -333,6 +337,7 @@ components:
         status: {$ref: '#/components/schemas/PlanStatus'}
         current_price: {$ref: '#/components/schemas/PriceVersion'}
         published_at: {type: string, format: date-time, nullable: true}
+        version: {type: integer}
         created_at: {type: string, format: date-time}
         updated_at: {type: string, format: date-time}
     Discount:

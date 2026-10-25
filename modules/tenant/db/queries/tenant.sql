@@ -23,8 +23,22 @@ ORDER BY created_at DESC, id DESC
 LIMIT $1;
 
 -- name: InsertStaff :exec
-INSERT INTO tenant.staff_members (id, tenant_id, subject, email, display_name, role, version, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $7);
+INSERT INTO tenant.staff_members (id, tenant_id, subject, email, display_name, role, status, invited_at, version, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $9);
+
+-- name: GetStaffByEmail :one
+SELECT * FROM tenant.staff_members WHERE tenant_id = $1 AND email = $2;
+
+-- 招待中の再送・有効化・最終利用日時（version は事業者の編集の楽観ロックなので上げない）
+-- name: UpdateStaffLifecycle :exec
+UPDATE tenant.staff_members SET status = $2, invited_at = $3, last_seen_at = $4, updated_at = $5 WHERE id = $1;
+
+-- 所属する事業者の一覧（全事業者を横断する。system スコープで呼ぶ）
+-- name: ListMembershipsBySubject :many
+SELECT s.id, s.tenant_id, s.role, s.status, s.invited_at, s.last_seen_at, t.name AS tenant_name, t.status AS tenant_status
+  FROM tenant.staff_members s JOIN tenant.tenants t ON t.id = s.tenant_id
+ WHERE s.subject = $1
+ ORDER BY t.name, t.id;
 
 -- name: GetStaff :one
 SELECT * FROM tenant.staff_members WHERE id = $1;
@@ -38,8 +52,9 @@ UPDATE tenant.staff_members SET role = $2, version = version + 1, updated_at = $
 -- name: DeleteStaff :execrows
 DELETE FROM tenant.staff_members WHERE id = $1;
 
+-- 最後のオーナーの判定は有効なオーナーだけで数える（招待中は数えない。business-console §3）
 -- name: CountOwners :one
-SELECT count(*) FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner';
+SELECT count(*) FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner' AND status = 'active';
 
 -- name: ListStaff :many
 SELECT * FROM tenant.staff_members

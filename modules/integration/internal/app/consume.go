@@ -16,6 +16,7 @@ import (
 	customer "subscription-platform/modules/customer/contracts"
 	"subscription-platform/modules/integration/internal/adapter/postgres/sqlcgen"
 	"subscription-platform/modules/integration/internal/domain"
+	tenant "subscription-platform/modules/tenant/contracts"
 )
 
 type customerIDKey struct{}
@@ -126,6 +127,20 @@ func (s *Service) handleEmail(ctx context.Context, tx db.Tx, env sk.EventEnvelop
 		}
 		_, err := q.SkipPendingEmailsForCustomer(ctx, sqlcgen.SkipPendingEmailsForCustomerParams{CustomerAccountID: uuidPtr(p.CustomerAccountID.UUID()), UpdatedAt: now})
 		return err
+	case tenant.EventStaffAdded:
+		var p tenant.StaffAddedPayload
+		if err := json.Unmarshal(env.Payload, &p); err != nil {
+			return messaging.Permanent(err)
+		}
+		src := env.EventID.UUID()
+		id, inserted, err := s.insertEmail(ctx, q, domain.StaffAddedPlan(p.TenantID, p.StaffID, string(p.Role)), &src, now)
+		if err != nil || !inserted {
+			return err
+		}
+		if ids, ok := ctx.Value(emailIDsKey{}).(*[]uuid.UUID); ok {
+			*ids = append(*ids, id)
+		}
+		return nil
 	case "billing.invoice_issued":
 		var p struct {
 			InvoiceID      sk.InvoiceID      `json:"invoice_id"`
@@ -193,6 +208,13 @@ func (s *Service) insertEmail(ctx context.Context, q *sqlcgen.Queries, plan *dom
 	}
 	if plan.EndpointID != nil {
 		p.EndpointID = uuidPtr(plan.EndpointID.UUID())
+	}
+	if plan.StaffID != nil {
+		sid, err := uuid.Parse(*plan.StaffID)
+		if err != nil {
+			return uuid.Nil, false, err
+		}
+		p.StaffID = &sid
 	}
 	n, err := q.InsertEmail(ctx, p)
 	if err != nil {

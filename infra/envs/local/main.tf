@@ -75,10 +75,17 @@ resource "aws_ses_email_identity" "noreply" {
   email = "noreply@sp.local"
 }
 
-# AUTH_MODE=cognito 用の 3 つのプール（PoC の標準は AUTH_MODE=dev）
+# AUTH_MODE=cognito 用の契約者・運営者のプール（PoC の標準は AUTH_MODE=dev）
 resource "aws_cognito_user_pool" "pool" {
-  for_each = toset(["consumer", "staff", "operator"])
+  for_each = toset(["consumer", "operator"])
   name     = "sp-local-${each.key}"
+}
+
+# スタッフのプール（事業者コンソール。本番と同じ定義のモジュール。business-console §5.3）
+module "staff_auth" {
+  source      = "../../modules/staff_auth"
+  name        = "sp-local-staff"
+  console_url = "http://localhost:8090/console/login"
 }
 
 resource "aws_cognito_user_pool_client" "client" {
@@ -100,5 +107,8 @@ output "queue_urls" {
 }
 
 output "cognito" {
-  value = { for k, p in aws_cognito_user_pool.pool : k => { id = p.id, client_id = aws_cognito_user_pool_client.client[k].id } }
+  value = merge(
+    { for k, p in aws_cognito_user_pool.pool : k => { id = p.id, client_id = aws_cognito_user_pool_client.client[k].id } },
+    { staff = { id = module.staff_auth.user_pool_id, client_id = module.staff_auth.client_id } },
+  )
 }

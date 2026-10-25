@@ -259,6 +259,7 @@ type Plan struct {
 	Status          PlanStatus          `json:"status"`
 	TrialDays       int                 `json:"trial_days"`
 	UpdatedAt       time.Time           `json:"updated_at"`
+	Version         int                 `json:"version"`
 }
 
 // PlanBillingInterval defines model for Plan.BillingInterval.
@@ -289,6 +290,7 @@ type Product struct {
 	Id          openapi_types.UUID `json:"id"`
 	Name        string             `json:"name"`
 	UpdatedAt   time.Time          `json:"updated_at"`
+	Version     int                `json:"version"`
 }
 
 // CommonProblem defines model for common_Problem.
@@ -311,6 +313,9 @@ type CommonProblem struct {
 
 // CouponIDPath defines model for CouponIDPath.
 type CouponIDPath = openapi_types.UUID
+
+// IfMatch defines model for IfMatch.
+type IfMatch = string
 
 // PlanIDPath defines model for PlanIDPath.
 type PlanIDPath = openapi_types.UUID
@@ -393,6 +398,12 @@ type ConsoleUpdatePlanJSONBody struct {
 	TrialDays   *int    `json:"trial_days,omitempty"`
 }
 
+// ConsoleUpdatePlanParams defines parameters for ConsoleUpdatePlan.
+type ConsoleUpdatePlanParams struct {
+	// IfMatch 楽観ロック（version。business-console FR-015）
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
+}
+
 // ConsoleListPriceVersionsParams defines parameters for ConsoleListPriceVersions.
 type ConsoleListPriceVersionsParams struct {
 	Limit *CommonLimit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -424,6 +435,12 @@ type ConsoleCreateProductJSONBody struct {
 type ConsoleUpdateProductJSONBody struct {
 	Description *string `json:"description,omitempty"`
 	Name        *string `json:"name,omitempty"`
+}
+
+// ConsoleUpdateProductParams defines parameters for ConsoleUpdateProduct.
+type ConsoleUpdateProductParams struct {
+	// IfMatch 楽観ロック（version。business-console FR-015）
+	IfMatch *IfMatch `json:"If-Match,omitempty"`
 }
 
 // ConsoleCreateCouponJSONRequestBody defines body for ConsoleCreateCoupon for application/json ContentType.
@@ -472,7 +489,7 @@ type ServerInterface interface {
 	ConsoleGetPlan(w http.ResponseWriter, r *http.Request, planId PlanIDPath)
 
 	// (PATCH /v1/console/plans/{plan_id})
-	ConsoleUpdatePlan(w http.ResponseWriter, r *http.Request, planId PlanIDPath)
+	ConsoleUpdatePlan(w http.ResponseWriter, r *http.Request, planId PlanIDPath, params ConsoleUpdatePlanParams)
 
 	// (GET /v1/console/plans/{plan_id}/price-versions)
 	ConsoleListPriceVersions(w http.ResponseWriter, r *http.Request, planId PlanIDPath, params ConsoleListPriceVersionsParams)
@@ -496,7 +513,7 @@ type ServerInterface interface {
 	ConsoleGetProduct(w http.ResponseWriter, r *http.Request, productId ProductIDPath)
 
 	// (PATCH /v1/console/products/{product_id})
-	ConsoleUpdateProduct(w http.ResponseWriter, r *http.Request, productId ProductIDPath)
+	ConsoleUpdateProduct(w http.ResponseWriter, r *http.Request, productId ProductIDPath, params ConsoleUpdateProductParams)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -760,8 +777,32 @@ func (siw *ServerInterfaceWrapper) ConsoleUpdatePlan(w http.ResponseWriter, r *h
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConsoleUpdatePlanParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ConsoleUpdatePlan(w, r, planId)
+		siw.Handler.ConsoleUpdatePlan(w, r, planId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1005,8 +1046,32 @@ func (siw *ServerInterfaceWrapper) ConsoleUpdateProduct(w http.ResponseWriter, r
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConsoleUpdateProductParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch IfMatch
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ConsoleUpdateProduct(w, r, productId)
+		siw.Handler.ConsoleUpdateProduct(w, r, productId, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1491,6 +1556,7 @@ func (response ConsoleGetPlan404ApplicationProblemPlusJSONResponse) VisitConsole
 
 type ConsoleUpdatePlanRequestObject struct {
 	PlanId PlanIDPath `json:"plan_id"`
+	Params ConsoleUpdatePlanParams
 	Body   *ConsoleUpdatePlanJSONRequestBody
 }
 
@@ -1890,6 +1956,7 @@ func (response ConsoleGetProduct404ApplicationProblemPlusJSONResponse) VisitCons
 
 type ConsoleUpdateProductRequestObject struct {
 	ProductId ProductIDPath `json:"product_id"`
+	Params    ConsoleUpdateProductParams
 	Body      *ConsoleUpdateProductJSONRequestBody
 }
 
@@ -2232,10 +2299,11 @@ func (sh *strictHandler) ConsoleGetPlan(w http.ResponseWriter, r *http.Request, 
 }
 
 // ConsoleUpdatePlan operation middleware
-func (sh *strictHandler) ConsoleUpdatePlan(w http.ResponseWriter, r *http.Request, planId PlanIDPath) {
+func (sh *strictHandler) ConsoleUpdatePlan(w http.ResponseWriter, r *http.Request, planId PlanIDPath, params ConsoleUpdatePlanParams) {
 	var request ConsoleUpdatePlanRequestObject
 
 	request.PlanId = planId
+	request.Params = params
 
 	var body ConsoleUpdatePlanJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -2460,10 +2528,11 @@ func (sh *strictHandler) ConsoleGetProduct(w http.ResponseWriter, r *http.Reques
 }
 
 // ConsoleUpdateProduct operation middleware
-func (sh *strictHandler) ConsoleUpdateProduct(w http.ResponseWriter, r *http.Request, productId ProductIDPath) {
+func (sh *strictHandler) ConsoleUpdateProduct(w http.ResponseWriter, r *http.Request, productId ProductIDPath, params ConsoleUpdateProductParams) {
 	var request ConsoleUpdateProductRequestObject
 
 	request.ProductId = productId
+	request.Params = params
 
 	var body ConsoleUpdateProductJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

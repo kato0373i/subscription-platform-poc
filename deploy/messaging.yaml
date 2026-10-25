@@ -87,7 +87,7 @@ queues:
     process: worker-integration
     consumer: integration.email
     events: [subscription.started, subscription.trial_will_end, subscription.renewed, subscription.past_due, subscription.cancellation_scheduled,
-      subscription.canceled, billing.invoice_issued, billing.invoice_payment_failed, customer.withdrawn]
+      subscription.canceled, billing.invoice_issued, billing.invoice_payment_failed, customer.withdrawn, tenant.staff_added]
     concurrency: 5
     visibility_timeout_s: 60
     max_receive: 5

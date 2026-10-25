@@ -20,19 +20,19 @@ import (
 
 // Defines values for TenantStatus.
 const (
-	Active        TenantStatus = "active"
-	PendingReview TenantStatus = "pending_review"
-	Suspended     TenantStatus = "suspended"
+	TenantStatusActive        TenantStatus = "active"
+	TenantStatusPendingReview TenantStatus = "pending_review"
+	TenantStatusSuspended     TenantStatus = "suspended"
 )
 
 // Valid indicates whether the value is a known member of the TenantStatus enum.
 func (e TenantStatus) Valid() bool {
 	switch e {
-	case Active:
+	case TenantStatusActive:
 		return true
-	case PendingReview:
+	case TenantStatusPendingReview:
 		return true
-	case Suspended:
+	case TenantStatusSuspended:
 		return true
 	default:
 		return false
@@ -54,6 +54,24 @@ func (e ConsoleTenantRole) Valid() bool {
 	case Owner:
 		return true
 	case Viewer:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ConsoleTenantStaffStatus.
+const (
+	ConsoleTenantStaffStatusActive  ConsoleTenantStaffStatus = "active"
+	ConsoleTenantStaffStatusInvited ConsoleTenantStaffStatus = "invited"
+)
+
+// Valid indicates whether the value is a known member of the ConsoleTenantStaffStatus enum.
+func (e ConsoleTenantStaffStatus) Valid() bool {
+	switch e {
+	case ConsoleTenantStaffStatusActive:
+		return true
+	case ConsoleTenantStaffStatusInvited:
 		return true
 	default:
 		return false
@@ -102,9 +120,19 @@ type ConsoleTenantStaff struct {
 	DisplayName string             `json:"display_name"`
 	Email       string             `json:"email"`
 	Id          openapi_types.UUID `json:"id"`
-	Role        ConsoleTenantRole  `json:"role"`
-	Subject     string             `json:"subject"`
+
+	// InvitationExpired 招待中で、招待から 7 日を過ぎている
+	InvitationExpired bool                     `json:"invitation_expired"`
+	InvitedAt         *time.Time               `json:"invited_at"`
+	LastSeenAt        *time.Time               `json:"last_seen_at"`
+	Role              ConsoleTenantRole        `json:"role"`
+	Status            ConsoleTenantStaffStatus `json:"status"`
+	Subject           string                   `json:"subject"`
+	Version           int                      `json:"version"`
 }
+
+// ConsoleTenantStaffStatus defines model for ConsoleTenantStaff.Status.
+type ConsoleTenantStaffStatus string
 
 // TenantIDPath defines model for TenantIDPath.
 type TenantIDPath = openapi_types.UUID
@@ -139,7 +167,9 @@ type OpsCreateStaffJSONBody struct {
 	DisplayName string            `json:"display_name"`
 	Email       string            `json:"email"`
 	Role        ConsoleTenantRole `json:"role"`
-	Subject     string            `json:"subject"`
+
+	// Subject devtools ビルドだけ受け付ける（開発用 JWT の主体を直接登録する E2E の準備用）。省略すると招待（business-console §5）
+	Subject *string `json:"subject,omitempty"`
 }
 
 // OpsSuspendTenantJSONBody defines parameters for OpsSuspendTenant.

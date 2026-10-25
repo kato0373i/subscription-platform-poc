@@ -8,7 +8,7 @@ test("AC-BIL-032: 方針が未設定なら [1,3,7]・is_default=true。PUT す�
   const call = consoleOf(api, tenant);
   const got = await call<DunningPolicy>("GET", "/v1/console/dunning-policy");
   expect(got.status).toBe(200);
-  expect(got.body).toEqual({ retry_offsets_days: [1, 3, 7], is_default: true, updated_at: null });
+  expect(got.body).toEqual({ retry_offsets_days: [1, 3, 7], is_default: true, version: 0, updated_at: null }); // version は If-Match 用（business-console FR-015）
 
   for (let i = 0; i < 2; i++) {
     const put = await call<DunningPolicy>("PUT", "/v1/console/dunning-policy", { retry_offsets_days: [2, 5] });

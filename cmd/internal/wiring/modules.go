@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
 	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/google/uuid"
 
@@ -65,10 +66,14 @@ func modules(_ context.Context, b *Base, process string) ([]ModuleSet, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cursor codec: %w", err)
 	}
-	t := tenant.New(tenant.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec})
+	var staffIdP tenant.IdentityProvider
+	if id := b.Cfg.CognitoStaff.UserPoolID; id != "" {
+		staffIdP = tenant.CognitoIdentity{Client: cognitoidentityprovider.NewFromConfig(b.AWS), UserPoolID: id}
+	}
+	t := tenant.New(tenant.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Identity: staffIdP, AllowDirectSubject: config.DevtoolsBuild})
 	c := customer.New(customer.Deps{Pool: b.Pool, Clock: b.Clock})
 	cat := catalog.New(catalog.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Tenants: t.Service(), ReservationTTL: b.Cfg.CatalogCouponReservationTTL})
-	sub := subscription.New(subscription.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Catalog: cat.Service()})
+	sub := subscription.New(subscription.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Catalog: cat.Service(), Customer: c.Service()})
 	bil := billing.New(billing.Deps{Pool: b.Pool, Clock: b.Clock, Cursors: codec, Lease: b.Cfg.BillingCollectionLease})
 	pay, err := payments.New(payments.Deps{
 		Pool: b.Pool, Clock: b.Clock, Cursors: codec, Methods: b.Cfg.PaymentsMethods, EnableStub: config.DevtoolsBuild, StubSecret: b.Cfg.StubWebhookSecret,

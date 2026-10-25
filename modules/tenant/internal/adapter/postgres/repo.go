@@ -132,14 +132,16 @@ func (r *Repo) ListTenants(ctx context.Context, status *string, after *TenantCur
 func toStaff(r sqlcgen.TenantStaffMember) *domain.StaffMember {
 	return domain.RestoreStaff(domain.StaffState{
 		ID: sk.IDFromUUID[domain.StaffTag](r.ID), TenantID: sk.IDFromUUID[sk.TenantTag](r.TenantID), Subject: r.Subject,
-		Email: r.Email, DisplayName: r.DisplayName, Role: contracts.Role(r.Role), Version: int(r.Version), CreatedAt: r.CreatedAt.UTC(),
+		Email: r.Email, DisplayName: r.DisplayName, Role: contracts.Role(r.Role), Status: domain.StaffStatus(r.Status), InvitedAt: r.InvitedAt,
+		LastSeenAt: r.LastSeenAt, Version: int(r.Version), CreatedAt: r.CreatedAt.UTC(),
 	})
 }
 
 func (r *Repo) InsertStaff(ctx context.Context, m *domain.StaffMember) error {
 	s := m.State()
 	err := r.q.InsertStaff(ctx, sqlcgen.InsertStaffParams{
-		ID: s.ID.UUID(), TenantID: s.TenantID.UUID(), Subject: s.Subject, Email: s.Email, DisplayName: s.DisplayName, Role: string(s.Role), CreatedAt: s.CreatedAt,
+		ID: s.ID.UUID(), TenantID: s.TenantID.UUID(), Subject: s.Subject, Email: s.Email, DisplayName: s.DisplayName, Role: string(s.Role),
+		Status: string(s.Status), InvitedAt: s.InvitedAt, CreatedAt: s.CreatedAt,
 	})
 	if db.IsUniqueViolation(err) {
 		return ErrStaffExists
@@ -165,7 +167,8 @@ func (r *Repo) GetStaffBySubject(ctx context.Context, t sk.TenantID, subject str
 
 func (r *Repo) UpdateStaffRole(ctx context.Context, m *domain.StaffMember, now time.Time) error {
 	s := m.State()
-	n, err := r.q.UpdateStaffRole(ctx, sqlcgen.UpdateStaffRoleParams{ID: s.ID.UUID(), Role: string(s.Role), UpdatedAt: now, Version: int32(s.Version)})
+	// s.Version はドメインで進めた後の値なので、保存前の値（-1）で照合する
+	n, err := r.q.UpdateStaffRole(ctx, sqlcgen.UpdateStaffRoleParams{ID: s.ID.UUID(), Role: string(s.Role), UpdatedAt: now, Version: int32(s.Version - 1)})
 	if err != nil {
 		return fmt.Errorf("tenant: update staff: %w", err)
 	}
@@ -173,6 +176,47 @@ func (r *Repo) UpdateStaffRole(ctx context.Context, m *domain.StaffMember, now t
 		return ErrVersionConflict
 	}
 	return nil
+}
+
+// GetStaffByEmail は同じ事業者の同じメールアドレスのスタッフ（招待の重複の確認）。
+func (r *Repo) GetStaffByEmail(ctx context.Context, t sk.TenantID, email string) (*domain.StaffMember, error) {
+	row, err := r.q.GetStaffByEmail(ctx, sqlcgen.GetStaffByEmailParams{TenantID: t.UUID(), Email: email})
+	if err != nil {
+		return nil, notFound(err)
+	}
+	return toStaff(row), nil
+}
+
+// SaveStaffLifecycle は状態・招待日時・最終利用日時を保存する（version は上げない）。
+func (r *Repo) SaveStaffLifecycle(ctx context.Context, m *domain.StaffMember, now time.Time) error {
+	s := m.State()
+	return r.q.UpdateStaffLifecycle(ctx, sqlcgen.UpdateStaffLifecycleParams{ID: s.ID.UUID(), Status: string(s.Status), InvitedAt: s.InvitedAt, LastSeenAt: s.LastSeenAt, UpdatedAt: now})
+}
+
+// Membership は所属する事業者の一覧の 1 行。
+type Membership struct {
+	Staff        *domain.StaffMember
+	TenantName   string
+	TenantStatus contracts.TenantStatus
+}
+
+// ListMembershipsBySubject は subject の所属（全事業者。system スコープで呼ぶ）。
+func (r *Repo) ListMembershipsBySubject(ctx context.Context, subject string) ([]Membership, error) {
+	rows, err := r.q.ListMembershipsBySubject(ctx, subject)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]Membership, len(rows))
+	for i, row := range rows {
+		out[i] = Membership{
+			Staff: domain.RestoreStaff(domain.StaffState{
+				ID: sk.IDFromUUID[domain.StaffTag](row.ID), TenantID: sk.IDFromUUID[sk.TenantTag](row.TenantID), Subject: subject, Role: contracts.Role(row.Role),
+				Status: domain.StaffStatus(row.Status), InvitedAt: row.InvitedAt, LastSeenAt: row.LastSeenAt,
+			}),
+			TenantName: row.TenantName, TenantStatus: contracts.TenantStatus(row.TenantStatus),
+		}
+	}
+	return out, nil
 }
 
 func (r *Repo) DeleteStaff(ctx context.Context, id domain.StaffID) error {

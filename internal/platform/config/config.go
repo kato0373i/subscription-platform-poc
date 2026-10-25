@@ -17,7 +17,9 @@ import (
 // Version は -ldflags "-X subscription-platform/internal/platform/config.Version=<commit>" で埋め込む。
 var Version = "dev"
 
-type CognitoPool struct{ Issuer, ClientID string }
+// CognitoPool は Cognito のユーザープールの設定。JWKSURL は空なら Issuer から作る（MiniStack では上書きする）。
+// UserPoolID はスタッフのプールだけ使う（招待のための管理 API。business-console の設計 §5.3）。
+type CognitoPool struct{ Issuer, ClientID, JWKSURL, UserPoolID string }
 
 type Config struct {
 	Service string
@@ -149,14 +151,19 @@ func LoadFrom(service string, env Getenv, devtools bool) (Config, error) {
 		errs = append(errs, errors.New("AUTH_MODE=dev requires a devtools build"))
 	}
 	c.DevJWTKeyPath = get("DEV_JWT_KEY_PATH", "deploy/local/dev-jwt.pem")
-	if c.AuthMode == "cognito" && service == "api" {
-		for _, p := range []struct {
-			name string
-			dst  *CognitoPool
-		}{{"CONSUMER", &c.CognitoConsumer}, {"STAFF", &c.CognitoStaff}, {"OPERATOR", &c.CognitoOperator}} {
+	for _, p := range []struct {
+		name string
+		dst  *CognitoPool
+	}{{"CONSUMER", &c.CognitoConsumer}, {"STAFF", &c.CognitoStaff}, {"OPERATOR", &c.CognitoOperator}} {
+		if c.AuthMode == "cognito" && service == "api" {
 			p.dst.Issuer = required("COGNITO_" + p.name + "_ISSUER")
 			p.dst.ClientID = required("COGNITO_" + p.name + "_CLIENT_ID")
+		} else {
+			// devtools ビルドの AUTH_MODE=dev でも、設定があれば Cognito の ID トークンも受ける（ADR-C04）
+			p.dst.Issuer, p.dst.ClientID = get("COGNITO_"+p.name+"_ISSUER", ""), get("COGNITO_"+p.name+"_CLIENT_ID", "")
 		}
+		p.dst.JWKSURL = get("COGNITO_"+p.name+"_JWKS_URL", "")
+		p.dst.UserPoolID = get("COGNITO_"+p.name+"_USER_POOL_ID", "")
 	}
 
 	if service != "migrate" {

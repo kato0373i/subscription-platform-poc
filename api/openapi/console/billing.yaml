@@ -45,6 +45,8 @@ paths:
       operationId: consolePutDunningPolicy
       x-sp-permission: dunning.write
       x-sp-isolation: not_applicable:updates only the X-Tenant-Id tenant's policy
+      parameters:
+        - {name: If-Match, in: header, description: 楽観ロック（version。未設定の既定は 0。business-console FR-015）, schema: {type: string}}
       requestBody:
         required: true
         content:
@@ -97,8 +99,9 @@ components:
         uncollectible_at: {type: string, format: date-time, nullable: true}
     DunningPolicy:
       type: object
-      required: [retry_offsets_days, is_default, updated_at]
+      required: [retry_offsets_days, is_default, version, updated_at]
       properties:
         retry_offsets_days: {type: array, items: {type: integer}}
         is_default: {type: boolean}
+        version: {type: integer, description: 未設定（既定）は 0}
         updated_at: {type: string, format: date-time, nullable: true}

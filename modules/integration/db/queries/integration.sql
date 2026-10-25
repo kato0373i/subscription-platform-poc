@@ -128,8 +128,8 @@ SELECT count(*)::int FROM integration.webhook_deliveries WHERE endpoint_id = $1 
 
 -- name: InsertEmail :execrows
 INSERT INTO integration.email_notifications (id, tenant_id, template_key, dedupe_key, recipient_type, customer_account_id, subscription_id, invoice_id,
-  endpoint_id, source_event_id, variables, status, next_attempt_at, locked_until, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13, $12, $12)
+  endpoint_id, source_event_id, variables, status, next_attempt_at, locked_until, created_at, updated_at, staff_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13, $12, $12, $14)
 ON CONFLICT (dedupe_key) DO NOTHING;
 
 -- name: GetEmail :one

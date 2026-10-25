@@ -13,6 +13,7 @@ import (
 	"subscription-platform/internal/platform/outbox"
 	sk "subscription-platform/internal/sharedkernel"
 	"subscription-platform/modules/tenant/contracts"
+	"subscription-platform/modules/tenant/internal/adapter/identity"
 	"subscription-platform/modules/tenant/internal/adapter/postgres"
 	"subscription-platform/modules/tenant/internal/domain"
 )
@@ -23,11 +24,15 @@ type Service struct {
 	outbox *outbox.Writer
 	clock  sk.Clock
 	rand   io.Reader
+	idp    identity.Provider
 }
 
-// New は Service を作る。rand は API キーの乱数源（本番は crypto/rand）。
-func New(mdb *db.ModuleDB, w *outbox.Writer, clock sk.Clock, rand io.Reader) *Service {
-	return &Service{db: mdb, outbox: w, clock: clock, rand: rand}
+// New は Service を作る。rand は API キーの乱数源（本番は crypto/rand）。idp はスタッフの認証基盤（nil なら identity.Dev）。
+func New(mdb *db.ModuleDB, w *outbox.Writer, clock sk.Clock, rand io.Reader, idp identity.Provider) *Service {
+	if idp == nil {
+		idp = identity.Dev{}
+	}
+	return &Service{db: mdb, outbox: w, clock: clock, rand: rand, idp: idp}
 }
 
 var _ contracts.Service = (*Service)(nil)
@@ -231,7 +236,8 @@ func (s *Service) ListStaff(ctx context.Context, tenantID sk.TenantID, after *po
 }
 
 // ChangeStaffRole は C2。テナント行をロックしてから owner 数を数える（E1）。
-func (s *Service) ChangeStaffRole(ctx context.Context, tenantID sk.TenantID, staffID domain.StaffID, role contracts.Role) (domain.StaffState, error) {
+// expectedVersion は If-Match（任意）。違えば ErrVersionConflict（FR-015）。
+func (s *Service) ChangeStaffRole(ctx context.Context, tenantID sk.TenantID, staffID domain.StaffID, role contracts.Role, expectedVersion *int) (domain.StaffState, error) {
 	var st domain.StaffState
 	var before contracts.Role
 	var changed bool
@@ -243,6 +249,9 @@ func (s *Service) ChangeStaffRole(ctx context.Context, tenantID sk.TenantID, sta
 		m, err := repo.GetStaff(ctx, staffID)
 		if err != nil {
 			return mapNotFound(err, ErrStaffNotFound)
+		}
+		if expectedVersion != nil && *expectedVersion != m.State().Version {
+			return postgres.ErrVersionConflict
 		}
 		before = m.Role()
 		owners, err := repo.CountOwners(ctx, tenantID)
@@ -450,17 +459,30 @@ func (s *Service) AuthenticateAPIKey(ctx context.Context, rawKey string) (sk.Ten
 }
 
 // GetStaffRole は認可のミドルウェア向け。所属していなければ ErrStaffNotFound。
+// 招待中なら有効にし、最終利用日時を 1 時間に 1 回まで更新する（ADR-C05。更新が要るときだけ書き込みのトランザクションを開く）。
 func (s *Service) GetStaffRole(ctx context.Context, tenantID sk.TenantID, subject string) (contracts.Role, error) {
 	var role contracts.Role
-	err := s.db.ReadTx(db.WithTenantScope(ctx, tenantID), func(ctx context.Context, tx db.Tx) error {
-		m, err := postgres.New(tx).GetStaffBySubject(ctx, tenantID, subject)
+	var m *domain.StaffMember
+	ctx = db.WithTenantScope(ctx, tenantID)
+	err := s.db.ReadTx(ctx, func(ctx context.Context, tx db.Tx) error {
+		var err error
+		m, err = postgres.New(tx).GetStaffBySubject(ctx, tenantID, subject)
 		if err != nil {
 			return mapNotFound(err, contracts.ErrStaffNotFound)
 		}
 		role = m.Role()
 		return nil
 	})
-	return role, err
+	if err != nil {
+		return role, err
+	}
+	now := s.clock.Now()
+	if activated, touched := m.Activate(), m.Touch(now); activated || touched {
+		if err := s.db.InTx(ctx, func(ctx context.Context, tx db.Tx) error { return postgres.New(tx).SaveStaffLifecycle(ctx, m, now) }); err != nil {
+			return role, err
+		}
+	}
+	return role, nil
 }
 
 // ListOwnerContacts は Integration の通知用（P-INT-1）。suspended のテナントでも返す。
@@ -493,3 +515,195 @@ func mapNotFound(err, to error) error {
 
 // Now は業務時刻（ハンドラがカーソルなどに使う）。
 func (s *Service) Now() time.Time { return s.clock.Now() }
+
+// ---- 招待と所属（business-console の設計 §3・§5） ----
+
+// ErrStaffAlreadyMember は同じ事業者に同じメールアドレスのスタッフがいる。
+var ErrStaffAlreadyMember = errors.New("tenant: staff already member")
+
+// InviteStaff はメールアドレスでスタッフを招待する（console の C0・ops の最初のオーナー）。アカウントがなければ Cognito で作って招待メールを送り、
+// invited で所属を作る。有効なアカウントの人は active で追加し、通知メールのためのイベントを出す。
+func (s *Service) InviteStaff(ctx context.Context, tenantID sk.TenantID, email, displayName string, role contracts.Role) (domain.StaffState, error) {
+	e, err := domain.NormalizeEmail("email", email)
+	if err != nil {
+		return domain.StaffState{}, err
+	}
+	if !role.Valid() {
+		return domain.StaffState{}, &domain.ValidationError{Field: "role", Code: "invalid"}
+	}
+	// 認証基盤を呼ぶ前に、事業者の状態と重複を確かめる（無駄なアカウントを作らない。最終的な判定は保存のトランザクション）
+	if err := s.db.ReadTx(ctx, func(ctx context.Context, tx db.Tx) error {
+		repo := postgres.New(tx)
+		t, err := repo.GetTenant(ctx, tenantID, false)
+		if err != nil {
+			return mapNotFound(err, contracts.ErrTenantNotFound)
+		}
+		if !t.AllowsStaffWrite() {
+			return domain.ErrTenantNotWritable
+		}
+		if _, err := repo.GetStaffByEmail(ctx, tenantID, e); err == nil {
+			return ErrStaffAlreadyMember
+		} else if !errors.Is(err, postgres.ErrNotFound) {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return domain.StaffState{}, err
+	}
+	sub, acct, err := s.idp.EnsureUser(ctx, e, displayName)
+	if err != nil {
+		return domain.StaffState{}, err
+	}
+	var st domain.StaffState
+	err = s.db.InTx(ctx, func(ctx context.Context, tx db.Tx) error {
+		repo := postgres.New(tx)
+		t, err := repo.GetTenant(ctx, tenantID, false)
+		if err != nil {
+			return mapNotFound(err, contracts.ErrTenantNotFound)
+		}
+		m, err := domain.InviteStaffMember(t, sk.NewID[domain.StaffTag](), sub, e, displayName, role, acct, s.clock.Now())
+		if err != nil {
+			return err
+		}
+		if err := repo.InsertStaff(ctx, m); err != nil {
+			if errors.Is(err, postgres.ErrStaffExists) {
+				return ErrStaffAlreadyMember
+			}
+			return err
+		}
+		st = m.State()
+		return s.appendStaffEvent(ctx, tx, st, false)
+	})
+	if err != nil {
+		return domain.StaffState{}, err
+	}
+	auditctx.Annotate(ctx, "staff.invite", auditctx.Target{Type: "staff", ID: st.ID.String()}, nil,
+		map[string]any{"staff_id": st.ID.String(), "role": string(st.Role), "status": string(st.Status)}, auditctx.WithTenant(tenantID))
+	return st, nil
+}
+
+func (s *Service) appendStaffEvent(ctx context.Context, tx db.Tx, st domain.StaffState, resent bool) error {
+	var env sk.EventEnvelope
+	var err error
+	if st.Status == domain.StaffActive && !resent {
+		env, err = sk.NewEnvelope(contracts.EventStaffAdded, "staff_member", st.ID.UUID(), int64(st.Version), &st.TenantID, s.clock.Now(),
+			contracts.StaffAddedPayload{TenantID: st.TenantID, StaffID: st.ID.String(), Role: st.Role})
+	} else {
+		env, err = sk.NewEnvelope(contracts.EventStaffInvited, "staff_member", st.ID.UUID(), int64(st.Version), &st.TenantID, s.clock.Now(),
+			contracts.StaffInvitedPayload{TenantID: st.TenantID, StaffID: st.ID.String(), Resent: resent})
+	}
+	if err != nil {
+		return err
+	}
+	return s.outbox.Append(ctx, tx, env)
+}
+
+// ResendInvitation は招待を再送する（invited のときだけ。期限を再送から 7 日にする）。アカウントがすでに有効なら所属を active にする。
+func (s *Service) ResendInvitation(ctx context.Context, tenantID sk.TenantID, staffID domain.StaffID) (domain.StaffState, error) {
+	var email string
+	if err := s.db.ReadTx(ctx, func(ctx context.Context, tx db.Tx) error {
+		m, err := postgres.New(tx).GetStaff(ctx, staffID)
+		if err != nil {
+			return mapNotFound(err, ErrStaffNotFound)
+		}
+		if m.State().Status != domain.StaffInvited {
+			return domain.ErrNotInvited
+		}
+		email = m.State().Email
+		return nil
+	}); err != nil {
+		return domain.StaffState{}, err
+	}
+	acct, err := s.idp.ResendInvitation(ctx, email)
+	if err != nil {
+		return domain.StaffState{}, err
+	}
+	var st domain.StaffState
+	err = s.db.InTx(ctx, func(ctx context.Context, tx db.Tx) error {
+		repo := postgres.New(tx)
+		m, err := repo.GetStaff(ctx, staffID)
+		if err != nil {
+			return mapNotFound(err, ErrStaffNotFound)
+		}
+		now := s.clock.Now()
+		if acct == domain.AccountActive {
+			m.Activate()
+		} else if err := m.MarkInvitationResent(now); err != nil {
+			return err
+		}
+		if err := repo.SaveStaffLifecycle(ctx, m, now); err != nil {
+			return err
+		}
+		st = m.State()
+		if st.Status == domain.StaffInvited {
+			return s.appendStaffEvent(ctx, tx, st, true)
+		}
+		return nil
+	})
+	if err != nil {
+		return domain.StaffState{}, err
+	}
+	auditctx.Annotate(ctx, "staff.resend_invitation", auditctx.Target{Type: "staff", ID: staffID.String()}, nil, map[string]any{"status": string(st.Status)})
+	return st, nil
+}
+
+// MembershipView は所属する事業者の一覧の 1 件。Permissions はそのロールで使える操作（画面のボタンの出し分け用。§5.5）。
+type MembershipView struct {
+	TenantID     sk.TenantID
+	TenantName   string
+	TenantStatus contracts.TenantStatus
+	Role         contracts.Role
+	StaffStatus  domain.StaffStatus
+	Permissions  []contracts.Permission
+}
+
+// ListMemberships はログイン中のスタッフ（subject）が所属する事業者。招待中の所属はここで有効にする（ADR-C05）。
+func (s *Service) ListMemberships(ctx context.Context, subject string) ([]MembershipView, error) {
+	sys := db.WithSystemScope(db.ClearScope(ctx), "staff memberships")
+	var out []MembershipView
+	err := s.db.InTx(sys, func(ctx context.Context, tx db.Tx) error {
+		repo := postgres.New(tx)
+		ms, err := repo.ListMembershipsBySubject(ctx, subject)
+		if err != nil {
+			return err
+		}
+		now := s.clock.Now()
+		for _, m := range ms {
+			activated, touched := m.Staff.Activate(), m.Staff.Touch(now)
+			if activated || touched {
+				if err := repo.SaveStaffLifecycle(ctx, m.Staff, now); err != nil {
+					return err
+				}
+			}
+			st := m.Staff.State()
+			var perms []contracts.Permission
+			for _, p := range contracts.Permissions {
+				if contracts.Allows(st.Role, p) {
+					perms = append(perms, p)
+				}
+			}
+			out = append(out, MembershipView{TenantID: st.TenantID, TenantName: m.TenantName, TenantStatus: m.TenantStatus, Role: st.Role, StaffStatus: st.Status, Permissions: perms})
+		}
+		return nil
+	})
+	return out, err
+}
+
+// GetStaffContact は contracts.Service（integration のスタッフ宛ての通知）。
+func (s *Service) GetStaffContact(ctx context.Context, tenantID sk.TenantID, staffID string) (contracts.OwnerContact, error) {
+	id, err := sk.ParseID[domain.StaffTag](staffID)
+	if err != nil {
+		return contracts.OwnerContact{}, contracts.ErrStaffNotFound
+	}
+	var out contracts.OwnerContact
+	err = s.db.ReadTx(db.WithTenantScope(ctx, tenantID), func(ctx context.Context, tx db.Tx) error {
+		m, err := postgres.New(tx).GetStaff(ctx, id)
+		if err != nil {
+			return mapNotFound(err, contracts.ErrStaffNotFound)
+		}
+		st := m.State()
+		out = contracts.OwnerContact{StaffID: st.ID.String(), Email: st.Email, DisplayName: st.DisplayName}
+		return nil
+	})
+	return out, err
+}

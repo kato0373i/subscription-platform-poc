@@ -53,10 +53,10 @@ func TestAllTemplatesRender(t *testing.T) {
 		"customer_name": "山田", "tenant_name": "T", "status": "active", "current_period": map[string]any{"start": "2026-10-15", "end": "2026-11-14"},
 		"trial_end": "2026-10-21", "first_charge_date": "2026-10-22", "amount": 980.0, "next_renewal_date": "2026-11-15", "reason": "dunning",
 		"canceled_on": "2026-10-20", "effective_date": "2026-11-14", "endpoint_url": "https://e", "failed_count": 2, "console_url": "http://c",
-		"mypage_url": "http://m", "payment_method_update_url": "http://p",
+		"mypage_url": "http://m", "payment_method_update_url": "http://p", "staff_name": "佐藤", "role_label": "管理者",
 	}
 	for _, k := range []string{domain.TmplSignupCompleted, domain.TmplTrialWillEnd, domain.TmplRenewalSucceeded, domain.TmplPaymentFailed,
-		domain.TmplCancellationScheduled, domain.TmplSubscriptionCanceled, domain.TmplWebhookDeliveryFailed} {
+		domain.TmplCancellationScheduled, domain.TmplSubscriptionCanceled, domain.TmplWebhookDeliveryFailed, domain.TmplStaffAdded} {
 		subj, body, err := mail.Render(k, vars)
 		if err != nil || subj == "" || body == "" || strings.Contains(subj+body, "<no value>") {
 			t.Errorf("%s: err=%v\n%s\n%s", k, err, subj, body)

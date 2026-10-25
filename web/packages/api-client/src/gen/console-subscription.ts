@@ -45,6 +45,13 @@ export interface components {
             id: string;
             /** @description 事業者ごとの契約者 ID（cus_…） */
             customer_id: string;
+            /** @description 事業者に渡してよい範囲の契約者情報（上位 FR-009）。退会済みなら name・email は null */
+            customer: {
+                id: string;
+                name: string | null;
+                email: string | null;
+                withdrawn: boolean;
+            };
             /** Format: uuid */
             product_id: string;
             /** Format: uuid */
@@ -139,6 +146,8 @@ export interface operations {
                 status?: components["schemas"]["Status"][];
                 plan_id?: string;
                 customer_id?: string;
+                /** @description 契約者のメールアドレス（完全一致。business-console FR-010） */
+                email?: string;
                 limit?: components["parameters"]["Limit"];
                 /** @description 前のページの next_cursor */
                 starting_after?: components["parameters"]["StartingAfter"];

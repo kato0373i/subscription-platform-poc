@@ -112,6 +112,18 @@ func (q *Queries) GetAccountForUpdate(ctx context.Context, id uuid.UUID) (Custom
 	return i, err
 }
 
+const getActiveAccountIDByEmail = `-- name: GetActiveAccountIDByEmail :one
+SELECT id FROM customer.customer_accounts WHERE email = $1 AND status = 'active'
+`
+
+// 事業者コンソールのメールアドレス検索（business-console FR-010。system スコープで呼び、リンクで事業者の範囲に絞る）
+func (q *Queries) GetActiveAccountIDByEmail(ctx context.Context, email *string) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, getActiveAccountIDByEmail, email)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getLink = `-- name: GetLink :one
 SELECT id, tenant_id, customer_account_id, created_at FROM customer.tenant_customer_links WHERE tenant_id = $1 AND customer_account_id = $2
 `

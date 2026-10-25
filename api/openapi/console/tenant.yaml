@@ -1,8 +1,83 @@
-# 事業者コンソールのスタッフ・API キー管理（identity.md §7.2）。主体は staff、ヘッダー X-Tenant-Id 必須。
+# 事業者コンソールのスタッフ・API キー管理（identity.md §7.2、business-console の設計 §5）。主体は staff、ヘッダー X-Tenant-Id 必須
+# （x-sp-tenant: none の 2 本だけは事業者を選ぶ前に呼ぶので不要）。
 openapi: 3.0.3
 info: {title: console-tenant, version: "1"}
 paths:
+  /v1/console/memberships:
+    get:
+      operationId: consoleListMemberships
+      x-sp-tenant: none
+      x-sp-isolation: not_applicable:returns only the authenticated staff's own memberships (filtered by the token subject)
+      responses:
+        "200":
+          description: ログイン中のスタッフが所属する事業者（事業者名の順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Membership'}}
+        "401": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/client-errors:
+    post:
+      operationId: consoleReportClientError
+      x-sp-tenant: none
+      x-sp-isolation: not_applicable:writes only to the server log; no tenant data is read
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [message]
+              properties:
+                message: {type: string, maxLength: 2000}
+                stack: {type: string, maxLength: 6000}
+                url: {type: string, maxLength: 2000}
+                tenant_id: {type: string, maxLength: 64}
+                correlation_id: {type: string, maxLength: 128}
+      responses:
+        "204": {description: 記録した}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/staff/{staff_id}/resend-invitation:
+    post:
+      operationId: consoleResendStaffInvitation
+      x-sp-permission: staff.manage
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/StaffIDPath'}
+      responses:
+        "202": {description: 招待を再送した（アカウントがすでに有効なら所属を有効にした）, content: {application/json: {schema: {$ref: '#/components/schemas/Staff'}}}}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+        "503": {$ref: '../common.yaml#/components/responses/Problem'}
   /v1/console/staff:
+    post:
+      operationId: consoleInviteStaff
+      x-sp-permission: staff.manage
+      x-sp-idempotency: required
+      x-sp-isolation: not_applicable:invites into the X-Tenant-Id tenant only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, display_name, role]
+              properties:
+                email: {type: string, maxLength: 254}
+                display_name: {type: string, maxLength: 100}
+                role: {$ref: '#/components/schemas/Role'}
+      responses:
+        "201": {description: 招待したスタッフ（新しいアカウントは invited、有効なアカウントの人は active）, content: {application/json: {schema: {$ref: '#/components/schemas/Staff'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+        "503": {$ref: '../common.yaml#/components/responses/Problem'}
     get:
       operationId: consoleListStaff
       x-sp-permission: console.read
@@ -31,6 +106,7 @@ paths:
       x-sp-isolation: tested
       parameters:
         - {$ref: '#/components/parameters/StaffIDPath'}
+        - {name: If-Match, in: header, description: 楽観ロック（スタッフの version）, schema: {type: string}}
       requestBody:
         required: true
         content:
@@ -130,14 +206,29 @@ components:
     Role: {type: string, enum: [owner, admin, viewer]}
     Staff:
       type: object
-      required: [id, subject, email, display_name, role, created_at]
+      required: [id, subject, email, display_name, role, status, invitation_expired, invited_at, last_seen_at, version, created_at]
       properties:
         id: {type: string, format: uuid}
         subject: {type: string}
         email: {type: string}
         display_name: {type: string}
         role: {$ref: '#/components/schemas/Role'}
+        status: {type: string, enum: [invited, active]}
+        invitation_expired: {type: boolean, description: 招待中で、招待から 7 日を過ぎている}
+        invited_at: {type: string, format: date-time, nullable: true}
+        last_seen_at: {type: string, format: date-time, nullable: true}
+        version: {type: integer}
         created_at: {type: string, format: date-time}
+    Membership:
+      type: object
+      required: [tenant_id, tenant_name, tenant_status, role, staff_status, permissions]
+      properties:
+        tenant_id: {type: string, format: uuid}
+        tenant_name: {type: string}
+        tenant_status: {type: string, enum: [pending_review, active, suspended]}
+        role: {$ref: '#/components/schemas/Role'}
+        staff_status: {type: string, enum: [invited, active]}
+        permissions: {type: array, items: {type: string}, description: このロールで使える操作（identity §3.4 の Permission）}
     ApiKey:
       type: object
       required: [id, name, key_prefix, status, created_at, revoked_at]

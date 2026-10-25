@@ -34,6 +34,13 @@ END $$;
 GRANT CREATE, CONNECT ON DATABASE sp TO sp_admin;
 SQL
 
+# スタッフの Cognito のプール（事業者コンソール。business-console §5.2・§5.3）。Terraform の出力から読む
+STAFF_POOL_ID="" STAFF_CLIENT_ID=""
+if cog="$(./scripts/tf.sh output -json cognito 2>/dev/null)" && [[ -n "$cog" ]]; then
+  STAFF_POOL_ID="$(printf '%s' "$cog" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("staff",{}).get("id",""))' 2>/dev/null || true)"
+  STAFF_CLIENT_ID="$(printf '%s' "$cog" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("staff",{}).get("client_id",""))' 2>/dev/null || true)"
+fi
+
 if [[ -f .env.local ]] && grep -q '^CURSOR_KEY=' .env.local; then
   CURSOR_KEY="$(grep '^CURSOR_KEY=' .env.local | cut -d= -f2-)"
 else
@@ -62,7 +69,14 @@ LOG_HTTP_BODY=redacted
 DEV_JWT_KEY_PATH=deploy/local/dev-jwt.pem
 BILLING_COLLECTION_LEASE=1m
 WEBHOOK_RETRY_JITTER=0
+CONSOLE_URL=http://localhost:8090/console/
 ENV
+  if [[ -n "$STAFF_POOL_ID" ]]; then
+    # MiniStack の ID トークンの iss は本物の AWS の URL なので、JWKS の取得先だけ MiniStack に向ける（下の行で環境ごとに書く）
+    echo "COGNITO_STAFF_ISSUER=https://cognito-idp.ap-northeast-1.amazonaws.com/$STAFF_POOL_ID"
+    echo "COGNITO_STAFF_CLIENT_ID=$STAFF_CLIENT_ID"
+    echo "COGNITO_STAFF_USER_POOL_ID=$STAFF_POOL_ID"
+  fi
 }
 
 {
@@ -74,6 +88,8 @@ ENV
   echo "E2E_READER_URL=postgres://sp_e2e_reader:sp_e2e_reader_local@localhost:$HOST_PORT/sp?sslmode=disable"
   echo "AWS_ENDPOINT_URL=http://localhost:4566"
   echo "QUEUE_URL_PREFIX=http://localhost:4566/000000000000/"
+  [[ -n "$STAFF_POOL_ID" ]] && echo "COGNITO_STAFF_JWKS_URL=http://localhost:4566/$STAFF_POOL_ID/.well-known/jwks.json"
+  true
 } > .env.local
 
 {
@@ -82,12 +98,23 @@ ENV
   echo "DATABASE_URL=postgres://sp_app:sp_app_local@$DB_CONTAINER:5432/sp?sslmode=disable"
   echo "AWS_ENDPOINT_URL=http://ministack:4566"
   echo "QUEUE_URL_PREFIX=http://ministack:4566/000000000000/"
+  [[ -n "$STAFF_POOL_ID" ]] && echo "COGNITO_STAFF_JWKS_URL=http://ministack:4566/$STAFF_POOL_ID/.well-known/jwks.json"
+  true
 } > .env.container
+
+# 事業者コンソール（SPA）のランタイムの設定（Vite の public。ビルドで dist に入り、nginx が配る。本番は S3 に別に置く）
+mkdir -p web/console/public
+cat > web/console/public/config.json <<JSON
+{"cognito":{"region":"ap-northeast-1","userPoolId":"$STAFF_POOL_ID","clientId":"$STAFF_CLIENT_ID","endpoint":"http://localhost:4566"}}
+JSON
 
 {
   echo "# task up が書き出す（Playwright が読む）"
   echo "API_BASE_URL=http://localhost:8080"
   echo "SINK_CONTROL_URL=http://localhost:18080"
+  echo "CONSOLE_BASE_URL=http://localhost:8090"
+  echo "COGNITO_STAFF_USER_POOL_ID=$STAFF_POOL_ID"
+  echo "AWS_ENDPOINT_URL=http://localhost:4566"
   echo "SINK_TARGET_BASE=${SINK_TARGET_BASE:-http://localhost:18080}"
   echo "E2E_READER_URL=postgres://sp_e2e_reader:sp_e2e_reader_local@localhost:$HOST_PORT/sp?sslmode=disable"
   echo "DEVLOGS_BIN=../.local/bin/devlogs"

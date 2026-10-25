@@ -195,7 +195,7 @@ func (q *Queries) GetDelivery(ctx context.Context, id uuid.UUID) (IntegrationWeb
 }
 
 const getEmail = `-- name: GetEmail :one
-SELECT id, tenant_id, template_key, dedupe_key, recipient_type, customer_account_id, subscription_id, invoice_id, endpoint_id, source_event_id, variables, subject, status, attempt_count, next_attempt_at, locked_until, provider_message_id, last_error, sent_at, created_at, updated_at FROM integration.email_notifications WHERE id = $1
+SELECT id, tenant_id, template_key, dedupe_key, recipient_type, customer_account_id, subscription_id, invoice_id, endpoint_id, source_event_id, variables, subject, status, attempt_count, next_attempt_at, locked_until, provider_message_id, last_error, sent_at, created_at, updated_at, staff_id FROM integration.email_notifications WHERE id = $1
 `
 
 func (q *Queries) GetEmail(ctx context.Context, id uuid.UUID) (IntegrationEmailNotification, error) {
@@ -223,6 +223,7 @@ func (q *Queries) GetEmail(ctx context.Context, id uuid.UUID) (IntegrationEmailN
 		&i.SentAt,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.StaffID,
 	)
 	return i, err
 }
@@ -400,8 +401,8 @@ func (q *Queries) InsertDelivery(ctx context.Context, arg InsertDeliveryParams) 
 const insertEmail = `-- name: InsertEmail :execrows
 
 INSERT INTO integration.email_notifications (id, tenant_id, template_key, dedupe_key, recipient_type, customer_account_id, subscription_id, invoice_id,
-  endpoint_id, source_event_id, variables, status, next_attempt_at, locked_until, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13, $12, $12)
+  endpoint_id, source_event_id, variables, status, next_attempt_at, locked_until, created_at, updated_at, staff_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending', $12, $13, $12, $12, $14)
 ON CONFLICT (dedupe_key) DO NOTHING
 `
 
@@ -419,6 +420,7 @@ type InsertEmailParams struct {
 	Variables         []byte
 	NextAttemptAt     *time.Time
 	LockedUntil       *time.Time
+	StaffID           *uuid.UUID
 }
 
 // ---- メール ----
@@ -437,6 +439,7 @@ func (q *Queries) InsertEmail(ctx context.Context, arg InsertEmailParams) (int64
 		arg.Variables,
 		arg.NextAttemptAt,
 		arg.LockedUntil,
+		arg.StaffID,
 	)
 	if err != nil {
 		return 0, err

@@ -82,6 +82,13 @@ export interface components {
             id: string;
             /** @description 事業者ごとの契約者 ID（cus_…） */
             customer_id: string;
+            /** @description 事業者に渡してよい範囲の契約者情報（上位 FR-009）。退会済みなら name・email は null */
+            customer: {
+                id: string;
+                name: string | null;
+                email: string | null;
+                withdrawn: boolean;
+            };
             /** Format: uuid */
             product_id: string;
             /** Format: uuid */

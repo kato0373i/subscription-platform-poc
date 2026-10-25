@@ -2,6 +2,7 @@ package contracts_test
 
 import (
 	"io/fs"
+	"slices"
 	"strings"
 	"testing"
 
@@ -59,6 +60,13 @@ func TestConsoleRoutesUseKnownPermissions(t *testing.T) {
 		}
 		for path, item := range spec.Paths.Map() {
 			for method, op := range item.Operations() {
+				if tf, _ := op.Extensions["x-sp-tenant"].(string); tf == "none" {
+					// 事業者を選ぶ前の API は 2 本だけ（business-console の設計 §5.4。tenant の範囲を越える API を増やさない）
+					if !slices.Contains([]string{"consoleListMemberships", "consoleReportClientError"}, op.OperationID) {
+						t.Errorf("%s %s %s: x-sp-tenant: none は所属の一覧・画面のエラーの収集だけに付ける", p, method, path)
+					}
+					continue
+				}
 				v, _ := op.Extensions["x-sp-permission"].(string)
 				if !contracts.Permission(v).Known() {
 					t.Errorf("%s %s %s: x-sp-permission %q は §3.4 の表にない", p, method, path, v)

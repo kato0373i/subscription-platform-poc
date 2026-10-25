@@ -17,6 +17,7 @@ import (
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/lestrrat-go/jwx/v3/jwa"
+	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jwt"
 
 	"subscription-platform/internal/platform/auditctx"
@@ -316,5 +317,54 @@ func TestLongCorrelationIDIsReplaced(t *testing.T) {
 	got := rec.Header().Get("X-Correlation-Id")
 	if len(got) != 36 || rec.Code != 404 {
 		t.Fatalf("correlation = %q status = %d", got, rec.Code)
+	}
+}
+
+// CognitoVerifier：JWKS（テスト用のサーバー）で RS256 の ID トークンを検証し、MultiVerifier が iss で振り分ける。
+func TestCognitoAndMultiVerifier(t *testing.T) {
+	key, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pub, err := jwk.Import(key.Public())
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = pub.Set(jwk.KeyIDKey, "k1")
+	_ = pub.Set(jwk.AlgorithmKey, jwa.RS256())
+	set := jwk.NewSet()
+	_ = set.AddKey(pub)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) { _ = json.NewEncoder(w).Encode(set) }))
+	defer srv.Close()
+
+	iss := "https://cognito-idp.ap-northeast-1.amazonaws.com/ap-northeast-1_TEST"
+	ctx := context.Background()
+	cv, err := httpx.NewCognitoVerifier(ctx, map[httpx.UserPool]httpx.PoolSettings{
+		httpx.PoolStaff:    {Issuer: iss, Audience: "client-1"},
+		httpx.PoolConsumer: {}, // issuer が空のプールは登録しない
+	}, map[httpx.UserPool]string{httpx.PoolStaff: srv.URL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	priv, _ := jwk.Import(key)
+	_ = priv.Set(jwk.KeyIDKey, "k1")
+	tok, _ := jwt.NewBuilder().Issuer(iss).Audience([]string{"client-1"}).Subject("staff-sub").Expiration(time.Now().Add(time.Hour)).Build()
+	raw, err := jwt.Sign(tok, jwt.WithKey(jwa.RS256(), priv))
+	if err != nil {
+		t.Fatal(err)
+	}
+	devKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	mv := httpx.NewMultiVerifier(map[string]httpx.TokenVerifier{iss: cv, httpx.DevIssuer: httpx.NewDevJWTVerifier(&devKey.PublicKey)})
+	c, err := mv.Verify(ctx, string(raw), httpx.PoolStaff)
+	if err != nil || c.Subject != "staff-sub" {
+		t.Fatalf("cognito token: %v %+v", err, c)
+	}
+	if _, err := mv.Verify(ctx, string(raw), httpx.PoolConsumer); err == nil {
+		t.Fatal("登録していないプールで通った")
+	}
+	other, _ := jwt.NewBuilder().Issuer("https://evil.example").Audience([]string{"client-1"}).Subject("x").Expiration(time.Now().Add(time.Hour)).Build()
+	rawOther, _ := jwt.Sign(other, jwt.WithKey(jwa.RS256(), priv))
+	if _, err := mv.Verify(ctx, string(rawOther), httpx.PoolStaff); err == nil {
+		t.Fatal("知らない iss で通った")
 	}
 }

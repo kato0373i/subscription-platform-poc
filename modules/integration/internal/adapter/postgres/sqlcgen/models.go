@@ -32,6 +32,7 @@ type IntegrationEmailNotification struct {
 	SentAt            *time.Time
 	CreatedAt         time.Time
 	UpdatedAt         time.Time
+	StaffID           *uuid.UUID
 }
 
 type IntegrationInvoiceSummary struct {

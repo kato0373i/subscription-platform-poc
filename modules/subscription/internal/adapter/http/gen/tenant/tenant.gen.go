@@ -134,6 +134,14 @@ type ConsoleSubscriptionSubscription struct {
 	CreatedAt     time.Time                                    `json:"created_at"`
 	CurrentPeriod MeSubscriptionPeriod                         `json:"current_period"`
 
+	// Customer 事業者に渡してよい範囲の契約者情報（上位 FR-009）。退会済みなら name・email は null
+	Customer struct {
+		Email     *string `json:"email"`
+		Id        string  `json:"id"`
+		Name      *string `json:"name"`
+		Withdrawn bool    `json:"withdrawn"`
+	} `json:"customer"`
+
 	// CustomerId 事業者ごとの契約者 ID（cus_…）
 	CustomerId            string                                  `json:"customer_id"`
 	Entitled              bool                                    `json:"entitled"`

@@ -67,6 +67,22 @@ services:
     environment: {SERVICE_NAME: api}
     ports: ["8080:8080"]
 
+  # 事業者コンソール（web/console/dist を配り、/v1/ を api に渡す。task dev:container が先にビルドする）
+  console:
+    image: nginx:1.29-alpine
+    profiles: [app]
+    volumes:
+      - ./deploy/local/console.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./web/console/dist:/usr/share/nginx/html/console:ro
+      - ./web/console/public/config.json:/usr/share/nginx/html/console/config.json:ro
+    ports: ["8090:8090"]
+    depends_on: [api]
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8090/console/"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
   worker-billing:
     <<: *app
     entrypoint: ["/usr/local/bin/worker-billing"]

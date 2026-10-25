@@ -97,9 +97,9 @@ paths:
             schema:
               type: object
               additionalProperties: false
-              required: [subject, email, display_name, role]
+              required: [email, display_name, role]
               properties:
-                subject: {type: string}
+                subject: {type: string, description: devtools ビルドだけ受け付ける（開発用 JWT の主体を直接登録する E2E の準備用）。省略すると招待（business-console §5）}
                 email: {type: string}
                 display_name: {type: string}
                 role: {$ref: '../console/tenant.yaml#/components/schemas/Role'}

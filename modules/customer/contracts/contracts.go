@@ -62,6 +62,9 @@ type Service interface {
 	ResolveOrCreateAccount(ctx context.Context, in AuthIdentity) (AccountView, error)
 	// GetTenantCustomerProfile はそのテナントとのリンクがなければ ErrLinkNotFound（他テナントの契約者の個人情報を返さない）。
 	GetTenantCustomerProfile(ctx context.Context, tenantID sk.TenantID, id sk.CustomerAccountID) (TenantCustomerProfile, error)
+	// FindTenantCustomerIDByEmail はメールアドレス（完全一致）の契約者の、そのテナントでの ID。
+	// アカウントがない・そのテナントとのリンクがなければ ErrLinkNotFound（存在を区別して漏らさない）。
+	FindTenantCustomerIDByEmail(ctx context.Context, tenantID sk.TenantID, email string) (TenantCustomerID, error)
 }
 
 var (

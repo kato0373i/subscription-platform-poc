@@ -114,7 +114,9 @@ type routePolicy struct {
 	permission  string
 	idempotency bool
 	isolation   string
-	validator   routers.Router
+	// tenantFree は x-sp-tenant: none（事業者を選ぶ前の console の API）。X-Tenant-Id を求めず、権限の判定をしない（ハンドラが subject で絞る）
+	tenantFree bool
+	validator  routers.Router
 }
 
 // Router はルーティングと共通の処理。
@@ -210,7 +212,13 @@ func ParsePolicies(spec *openapi3.T) ([]*routePolicy, error) {
 			pol.idempotency = extString(op, "x-sp-idempotency") == "required"
 			pol.isolation = extString(op, "x-sp-isolation")
 			where := fmt.Sprintf("%s %s (%s)", method, path, op.OperationID)
-			if aud == AudienceConsole && pol.permission == "" {
+			switch v := extString(op, "x-sp-tenant"); {
+			case v == "none" && aud == AudienceConsole:
+				pol.tenantFree = true
+			case v != "":
+				errs = append(errs, fmt.Errorf("%s: x-sp-tenant must be none and is allowed only on console routes", where))
+			}
+			if aud == AudienceConsole && pol.permission == "" && !pol.tenantFree {
 				errs = append(errs, fmt.Errorf("%s: x-sp-permission is required for console", where))
 			}
 			if aud == AudienceMe || aud == AudienceConsole || aud == AudienceTenant {
@@ -424,7 +432,7 @@ func (r *Router) wrap(pol *routePolicy, h http.Handler) http.Handler {
 		if !needsAuth {
 			// 申込ページの公開 API は認証が任意。consumer のトークンがあれば検証して主体を置く（不正なトークンは 401。catalog.md §7.5）
 			if pol.audience == AudienceCheckout && bearer(req) != "" {
-				ctx, p, err := r.authenticate(req, KindConsumer)
+				ctx, p, err := r.authenticate(req, KindConsumer, pol)
 				if err != nil {
 					WriteProblem(w, req, err)
 					return
@@ -434,13 +442,18 @@ func (r *Router) wrap(pol *routePolicy, h http.Handler) http.Handler {
 			r.afterAuth(pol, h, w, req)
 			return
 		}
-		ctx, p, err := r.authenticate(req, kind)
+		ctx, p, err := r.authenticate(req, kind, pol)
 		if err != nil {
 			WriteProblem(w, req, err)
 			return
 		}
 		ctx = r.annotateContext(ctx, p)
 		req = req.WithContext(ctx)
+		if pol.tenantFree {
+			// 事業者を選ぶ前の API：所属の判定・監査・スコープの設定はせず、ハンドラが subject で絞る
+			r.afterAuth(pol, h, w, req.WithContext(withPrincipal(req.Context(), p)))
+			return
+		}
 		if pol.audience.audited() && isMutation(req.Method) {
 			r.audited(pol, p, h, w, req)
 			return
@@ -534,7 +547,7 @@ func kindOf(p UserPool) PrincipalKind {
 }
 
 // authenticate は資格情報を検証して主体を作る。正しい資格情報でも入口の主体と違えば 403、無効なら 401。
-func (r *Router) authenticate(req *http.Request, want PrincipalKind) (context.Context, Principal, error) {
+func (r *Router) authenticate(req *http.Request, want PrincipalKind, pol *routePolicy) (context.Context, Principal, error) {
 	ctx := req.Context()
 	raw := bearer(req)
 	log := observability.Logger("platform.http")
@@ -602,6 +615,9 @@ func (r *Router) authenticate(req *http.Request, want PrincipalKind) (context.Co
 			return ctx, Principal{}, Error(errcodes.Forbidden, "")
 		}
 	case KindStaff:
+		if pol != nil && pol.tenantFree {
+			break
+		}
 		tid := req.Header.Get("X-Tenant-Id")
 		if tid == "" {
 			return ctx, Principal{}, Error(errcodes.ValidationFailed, "X-Tenant-Id is required", FieldError{Field: "X-Tenant-Id", Code: "required"})

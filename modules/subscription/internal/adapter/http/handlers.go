@@ -11,9 +11,11 @@ import (
 	"github.com/google/uuid"
 
 	"subscription-platform/api/openapi"
+	"subscription-platform/internal/platform/db"
 	"subscription-platform/internal/platform/httpx"
 	"subscription-platform/internal/platform/httpx/errcodes"
 	sk "subscription-platform/internal/sharedkernel"
+	customer "subscription-platform/modules/customer/contracts"
 	c "subscription-platform/modules/subscription/contracts"
 	"subscription-platform/modules/subscription/internal/adapter/http/gen/console"
 	"subscription-platform/modules/subscription/internal/adapter/http/gen/me"
@@ -23,8 +25,8 @@ import (
 )
 
 // Register は me・console・tenant のルートを登録する。
-func Register(r *httpx.Router, svc *app.Service, codec *httpx.CursorCodec) error {
-	h := &handlers{svc: svc, codec: codec}
+func Register(r *httpx.Router, svc *app.Service, codec *httpx.CursorCodec, customer customer.Service) error {
+	h := &handlers{svc: svc, codec: codec, customer: customer}
 	for _, m := range []struct {
 		spec     string
 		register func(httpx.ServeMux)
@@ -85,8 +87,9 @@ func problem(err error) error {
 }
 
 type handlers struct {
-	svc   *app.Service
-	codec *httpx.CursorCodec
+	svc      *app.Service
+	codec    *httpx.CursorCodec
+	customer customer.Service // console の契約者情報（nil なら付けない）
 }
 
 // ---- 共通のリソースの形（§7.1）。生成された型は package ごとに名前が違うので、JSON の形で作ってから変換する ----
@@ -118,6 +121,35 @@ type resource struct {
 	CreatedAt             time.Time           `json:"created_at"`
 	PaymentMethodID       *sk.PaymentMethodID `json:"payment_method_id,omitempty"`
 	AppliedDiscount       *map[string]int     `json:"applied_discount,omitempty"`
+	Customer              *customerInfo       `json:"customer,omitempty"`
+}
+
+// customerInfo は console に出す契約者情報（事業者に渡してよい範囲。上位 FR-009・business-console FR-010）。
+type customerInfo struct {
+	ID        string  `json:"id"`
+	Name      *string `json:"name"`
+	Email     *string `json:"email"`
+	Withdrawn bool    `json:"withdrawn"`
+}
+
+// withCustomer は console の契約に契約者情報を付ける。取れなければ ID だけにする（一覧の表示を止めない）。
+func (h *handlers) withCustomer(ctx context.Context, r *resource, v c.SubscriptionView) {
+	info := &customerInfo{ID: v.TenantCustomerID}
+	r.Customer = info
+	if h.customer == nil {
+		return
+	}
+	p, err := h.customer.GetTenantCustomerProfile(db.ClearScope(ctx), v.TenantID, v.CustomerAccountID)
+	if err != nil {
+		return
+	}
+	info.Withdrawn = p.Withdrawn
+	if !p.Withdrawn {
+		info.Name, info.Email = &p.Name, &p.Email
+		if p.Name == "" {
+			info.Name = nil
+		}
+	}
 }
 
 type audience int
@@ -292,11 +324,39 @@ func (h consoleHandlers) ConsoleListSubscriptions(ctx context.Context, req conso
 		u := *req.Params.PlanId
 		f.PlanID = &u
 	}
-	res, err := h.list(ctx, f, req.Params.StartingAfter, req.Params.Limit, forConsole)
+	if e := req.Params.Email; e != nil && *e != "" && h.customer != nil {
+		cus, err := h.customer.FindTenantCustomerIDByEmail(db.ClearScope(ctx), httpx.TenantID(ctx), *e)
+		if errors.Is(err, customer.ErrLinkNotFound) {
+			return console.ConsoleListSubscriptions200JSONResponse{Data: []console.Subscription{}}, nil // 該当なし（存在を区別しない）
+		}
+		if err != nil {
+			return nil, err
+		}
+		s := string(cus)
+		if f.TenantCustomerID != nil && *f.TenantCustomerID != s {
+			return console.ConsoleListSubscriptions200JSONResponse{Data: []console.Subscription{}}, nil
+		}
+		f.TenantCustomerID = &s
+	}
+	cur, err := h.cursor(req.Params.StartingAfter)
 	if err != nil {
 		return nil, err
 	}
-	return convert[console.ConsoleListSubscriptions200JSONResponse](res)
+	items, more, err := h.svc.List(ctx, f, cur, pageLimit(req.Params.Limit))
+	if err != nil {
+		return nil, problem(err)
+	}
+	out := listResult{Data: make([]resource, len(items)), HasMore: more}
+	for i, v := range items {
+		out.Data[i] = toResource(v, forConsole)
+		h.withCustomer(ctx, &out.Data[i], v)
+	}
+	if more {
+		last := items[len(items)-1]
+		next := h.codec.Encode(postgres.Cursor{CreatedAt: last.CreatedAt, ID: last.ID.UUID()})
+		out.NextCursor = &next
+	}
+	return convert[console.ConsoleListSubscriptions200JSONResponse](out)
 }
 
 func (h consoleHandlers) ConsoleGetSubscription(ctx context.Context, req console.ConsoleGetSubscriptionRequestObject) (console.ConsoleGetSubscriptionResponseObject, error) {
@@ -304,7 +364,9 @@ func (h consoleHandlers) ConsoleGetSubscription(ctx context.Context, req console
 	if err != nil {
 		return nil, problem(err)
 	}
-	return convert[console.ConsoleGetSubscription200JSONResponse](toResource(v, forConsole))
+	r := toResource(v, forConsole)
+	h.withCustomer(ctx, &r, v)
+	return convert[console.ConsoleGetSubscription200JSONResponse](r)
 }
 
 // ---- tenant ----

@@ -36,6 +36,45 @@ func (e ApiKeyStatus) Valid() bool {
 	}
 }
 
+// Defines values for MembershipStaffStatus.
+const (
+	MembershipStaffStatusActive  MembershipStaffStatus = "active"
+	MembershipStaffStatusInvited MembershipStaffStatus = "invited"
+)
+
+// Valid indicates whether the value is a known member of the MembershipStaffStatus enum.
+func (e MembershipStaffStatus) Valid() bool {
+	switch e {
+	case MembershipStaffStatusActive:
+		return true
+	case MembershipStaffStatusInvited:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MembershipTenantStatus.
+const (
+	MembershipTenantStatusActive        MembershipTenantStatus = "active"
+	MembershipTenantStatusPendingReview MembershipTenantStatus = "pending_review"
+	MembershipTenantStatusSuspended     MembershipTenantStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the MembershipTenantStatus enum.
+func (e MembershipTenantStatus) Valid() bool {
+	switch e {
+	case MembershipTenantStatusActive:
+		return true
+	case MembershipTenantStatusPendingReview:
+		return true
+	case MembershipTenantStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for Role.
 const (
 	Admin  Role = "admin"
@@ -51,6 +90,24 @@ func (e Role) Valid() bool {
 	case Owner:
 		return true
 	case Viewer:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for StaffStatus.
+const (
+	StaffStatusActive  StaffStatus = "active"
+	StaffStatusInvited StaffStatus = "invited"
+)
+
+// Valid indicates whether the value is a known member of the StaffStatus enum.
+func (e StaffStatus) Valid() bool {
+	switch e {
+	case StaffStatusActive:
+		return true
+	case StaffStatusInvited:
 		return true
 	default:
 		return false
@@ -88,6 +145,23 @@ type ApiKey struct {
 // ApiKeyStatus defines model for ApiKey.Status.
 type ApiKeyStatus string
 
+// Membership defines model for Membership.
+type Membership struct {
+	// Permissions このロールで使える操作（identity §3.4 の Permission）
+	Permissions  []string               `json:"permissions"`
+	Role         Role                   `json:"role"`
+	StaffStatus  MembershipStaffStatus  `json:"staff_status"`
+	TenantId     openapi_types.UUID     `json:"tenant_id"`
+	TenantName   string                 `json:"tenant_name"`
+	TenantStatus MembershipTenantStatus `json:"tenant_status"`
+}
+
+// MembershipStaffStatus defines model for Membership.StaffStatus.
+type MembershipStaffStatus string
+
+// MembershipTenantStatus defines model for Membership.TenantStatus.
+type MembershipTenantStatus string
+
 // Role defines model for Role.
 type Role string
 
@@ -97,9 +171,19 @@ type Staff struct {
 	DisplayName string             `json:"display_name"`
 	Email       string             `json:"email"`
 	Id          openapi_types.UUID `json:"id"`
-	Role        Role               `json:"role"`
-	Subject     string             `json:"subject"`
+
+	// InvitationExpired 招待中で、招待から 7 日を過ぎている
+	InvitationExpired bool        `json:"invitation_expired"`
+	InvitedAt         *time.Time  `json:"invited_at"`
+	LastSeenAt        *time.Time  `json:"last_seen_at"`
+	Role              Role        `json:"role"`
+	Status            StaffStatus `json:"status"`
+	Subject           string      `json:"subject"`
+	Version           int         `json:"version"`
 }
+
+// StaffStatus defines model for Staff.Status.
+type StaffStatus string
 
 // CommonProblem defines model for common_Problem.
 type CommonProblem struct {
@@ -145,6 +229,15 @@ type ConsoleCreateApiKeyJSONBody struct {
 	Name string `json:"name"`
 }
 
+// ConsoleReportClientErrorJSONBody defines parameters for ConsoleReportClientError.
+type ConsoleReportClientErrorJSONBody struct {
+	CorrelationId *string `json:"correlation_id,omitempty"`
+	Message       string  `json:"message"`
+	Stack         *string `json:"stack,omitempty"`
+	TenantId      *string `json:"tenant_id,omitempty"`
+	Url           *string `json:"url,omitempty"`
+}
+
 // ConsoleListStaffParams defines parameters for ConsoleListStaff.
 type ConsoleListStaffParams struct {
 	Limit *CommonLimit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -153,13 +246,32 @@ type ConsoleListStaffParams struct {
 	StartingAfter *CommonStartingAfter `form:"starting_after,omitempty" json:"starting_after,omitempty"`
 }
 
+// ConsoleInviteStaffJSONBody defines parameters for ConsoleInviteStaff.
+type ConsoleInviteStaffJSONBody struct {
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	Role        Role   `json:"role"`
+}
+
 // ConsoleUpdateStaffJSONBody defines parameters for ConsoleUpdateStaff.
 type ConsoleUpdateStaffJSONBody struct {
 	Role Role `json:"role"`
 }
 
+// ConsoleUpdateStaffParams defines parameters for ConsoleUpdateStaff.
+type ConsoleUpdateStaffParams struct {
+	// IfMatch 楽観ロック（スタッフの version）
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
 // ConsoleCreateApiKeyJSONRequestBody defines body for ConsoleCreateApiKey for application/json ContentType.
 type ConsoleCreateApiKeyJSONRequestBody ConsoleCreateApiKeyJSONBody
+
+// ConsoleReportClientErrorJSONRequestBody defines body for ConsoleReportClientError for application/json ContentType.
+type ConsoleReportClientErrorJSONRequestBody ConsoleReportClientErrorJSONBody
+
+// ConsoleInviteStaffJSONRequestBody defines body for ConsoleInviteStaff for application/json ContentType.
+type ConsoleInviteStaffJSONRequestBody ConsoleInviteStaffJSONBody
 
 // ConsoleUpdateStaffJSONRequestBody defines body for ConsoleUpdateStaff for application/json ContentType.
 type ConsoleUpdateStaffJSONRequestBody ConsoleUpdateStaffJSONBody
@@ -176,14 +288,26 @@ type ServerInterface interface {
 	// (DELETE /v1/console/api-keys/{api_key_id})
 	ConsoleRevokeApiKey(w http.ResponseWriter, r *http.Request, apiKeyId openapi_types.UUID)
 
+	// (POST /v1/console/client-errors)
+	ConsoleReportClientError(w http.ResponseWriter, r *http.Request)
+
+	// (GET /v1/console/memberships)
+	ConsoleListMemberships(w http.ResponseWriter, r *http.Request)
+
 	// (GET /v1/console/staff)
 	ConsoleListStaff(w http.ResponseWriter, r *http.Request, params ConsoleListStaffParams)
+
+	// (POST /v1/console/staff)
+	ConsoleInviteStaff(w http.ResponseWriter, r *http.Request)
 
 	// (DELETE /v1/console/staff/{staff_id})
 	ConsoleDeleteStaff(w http.ResponseWriter, r *http.Request, staffId StaffIDPath)
 
 	// (PATCH /v1/console/staff/{staff_id})
-	ConsoleUpdateStaff(w http.ResponseWriter, r *http.Request, staffId StaffIDPath)
+	ConsoleUpdateStaff(w http.ResponseWriter, r *http.Request, staffId StaffIDPath, params ConsoleUpdateStaffParams)
+
+	// (POST /v1/console/staff/{staff_id}/resend-invitation)
+	ConsoleResendStaffInvitation(w http.ResponseWriter, r *http.Request, staffId StaffIDPath)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -294,6 +418,34 @@ func (siw *ServerInterfaceWrapper) ConsoleRevokeApiKey(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// ConsoleReportClientError operation middleware
+func (siw *ServerInterfaceWrapper) ConsoleReportClientError(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConsoleReportClientError(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConsoleListMemberships operation middleware
+func (siw *ServerInterfaceWrapper) ConsoleListMemberships(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConsoleListMemberships(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ConsoleListStaff operation middleware
 func (siw *ServerInterfaceWrapper) ConsoleListStaff(w http.ResponseWriter, r *http.Request) {
 
@@ -331,6 +483,20 @@ func (siw *ServerInterfaceWrapper) ConsoleListStaff(w http.ResponseWriter, r *ht
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ConsoleListStaff(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConsoleInviteStaff operation middleware
+func (siw *ServerInterfaceWrapper) ConsoleInviteStaff(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConsoleInviteStaff(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -381,8 +547,58 @@ func (siw *ServerInterfaceWrapper) ConsoleUpdateStaff(w http.ResponseWriter, r *
 		return
 	}
 
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConsoleUpdateStaffParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ConsoleUpdateStaff(w, r, staffId)
+		siw.Handler.ConsoleUpdateStaff(w, r, staffId, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ConsoleResendStaffInvitation operation middleware
+func (siw *ServerInterfaceWrapper) ConsoleResendStaffInvitation(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "staff_id" -------------
+	var staffId StaffIDPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "staff_id", r.PathValue("staff_id"), &staffId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "staff_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ConsoleResendStaffInvitation(w, r, staffId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -515,9 +731,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/api-keys", wrapper.ConsoleListApiKeys)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/api-keys", wrapper.ConsoleCreateApiKey)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/console/api-keys/{api_key_id}", wrapper.ConsoleRevokeApiKey)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/client-errors", wrapper.ConsoleReportClientError)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/memberships", wrapper.ConsoleListMemberships)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/console/staff", wrapper.ConsoleListStaff)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/staff", wrapper.ConsoleInviteStaff)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/console/staff/{staff_id}", wrapper.ConsoleDeleteStaff)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/console/staff/{staff_id}", wrapper.ConsoleUpdateStaff)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/console/staff/{staff_id}/resend-invitation", wrapper.ConsoleResendStaffInvitation)
 
 	return m
 }
@@ -698,6 +918,77 @@ func (response ConsoleRevokeApiKey404ApplicationProblemPlusJSONResponse) VisitCo
 	return err
 }
 
+type ConsoleReportClientErrorRequestObject struct {
+	Body *ConsoleReportClientErrorJSONRequestBody
+}
+
+type ConsoleReportClientErrorResponseObject interface {
+	VisitConsoleReportClientErrorResponse(w http.ResponseWriter) error
+}
+
+type ConsoleReportClientError204Response struct {
+}
+
+func (response ConsoleReportClientError204Response) VisitConsoleReportClientErrorResponse(w http.ResponseWriter) error {
+	w.WriteHeader(204)
+	return nil
+}
+
+type ConsoleReportClientError400ApplicationProblemPlusJSONResponse struct {
+	CommonProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ConsoleReportClientError400ApplicationProblemPlusJSONResponse) VisitConsoleReportClientErrorResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleListMembershipsRequestObject struct {
+}
+
+type ConsoleListMembershipsResponseObject interface {
+	VisitConsoleListMembershipsResponse(w http.ResponseWriter) error
+}
+
+type ConsoleListMemberships200JSONResponse struct {
+	Data []Membership `json:"data"`
+}
+
+func (response ConsoleListMemberships200JSONResponse) VisitConsoleListMembershipsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleListMemberships401ApplicationProblemPlusJSONResponse struct {
+	CommonProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ConsoleListMemberships401ApplicationProblemPlusJSONResponse) VisitConsoleListMembershipsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(401)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 type ConsoleListStaffRequestObject struct {
 	Params ConsoleListStaffParams
 }
@@ -750,6 +1041,86 @@ func (response ConsoleListStaff403ApplicationProblemPlusJSONResponse) VisitConso
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleInviteStaffRequestObject struct {
+	Body *ConsoleInviteStaffJSONRequestBody
+}
+
+type ConsoleInviteStaffResponseObject interface {
+	VisitConsoleInviteStaffResponse(w http.ResponseWriter) error
+}
+
+type ConsoleInviteStaff201JSONResponse Staff
+
+func (response ConsoleInviteStaff201JSONResponse) VisitConsoleInviteStaffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(201)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleInviteStaff400ApplicationProblemPlusJSONResponse struct {
+	CommonProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ConsoleInviteStaff400ApplicationProblemPlusJSONResponse) VisitConsoleInviteStaffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleInviteStaff403ApplicationProblemPlusJSONResponse CommonProblem
+
+func (response ConsoleInviteStaff403ApplicationProblemPlusJSONResponse) VisitConsoleInviteStaffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleInviteStaff409ApplicationProblemPlusJSONResponse CommonProblem
+
+func (response ConsoleInviteStaff409ApplicationProblemPlusJSONResponse) VisitConsoleInviteStaffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleInviteStaff503ApplicationProblemPlusJSONResponse CommonProblem
+
+func (response ConsoleInviteStaff503ApplicationProblemPlusJSONResponse) VisitConsoleInviteStaffResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
 	_, err := buf.WriteTo(w)
 	return err
 }
@@ -816,6 +1187,7 @@ func (response ConsoleDeleteStaff409ApplicationProblemPlusJSONResponse) VisitCon
 
 type ConsoleUpdateStaffRequestObject struct {
 	StaffId StaffIDPath `json:"staff_id"`
+	Params  ConsoleUpdateStaffParams
 	Body    *ConsoleUpdateStaffJSONRequestBody
 }
 
@@ -895,6 +1267,86 @@ func (response ConsoleUpdateStaff409ApplicationProblemPlusJSONResponse) VisitCon
 	return err
 }
 
+type ConsoleResendStaffInvitationRequestObject struct {
+	StaffId StaffIDPath `json:"staff_id"`
+}
+
+type ConsoleResendStaffInvitationResponseObject interface {
+	VisitConsoleResendStaffInvitationResponse(w http.ResponseWriter) error
+}
+
+type ConsoleResendStaffInvitation202JSONResponse Staff
+
+func (response ConsoleResendStaffInvitation202JSONResponse) VisitConsoleResendStaffInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(202)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleResendStaffInvitation403ApplicationProblemPlusJSONResponse struct {
+	CommonProblemApplicationProblemPlusJSONResponse
+}
+
+func (response ConsoleResendStaffInvitation403ApplicationProblemPlusJSONResponse) VisitConsoleResendStaffInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(403)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleResendStaffInvitation404ApplicationProblemPlusJSONResponse CommonProblem
+
+func (response ConsoleResendStaffInvitation404ApplicationProblemPlusJSONResponse) VisitConsoleResendStaffInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleResendStaffInvitation409ApplicationProblemPlusJSONResponse CommonProblem
+
+func (response ConsoleResendStaffInvitation409ApplicationProblemPlusJSONResponse) VisitConsoleResendStaffInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(409)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type ConsoleResendStaffInvitation503ApplicationProblemPlusJSONResponse CommonProblem
+
+func (response ConsoleResendStaffInvitation503ApplicationProblemPlusJSONResponse) VisitConsoleResendStaffInvitationResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(503)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
 
@@ -907,14 +1359,26 @@ type StrictServerInterface interface {
 	// (DELETE /v1/console/api-keys/{api_key_id})
 	ConsoleRevokeApiKey(ctx context.Context, request ConsoleRevokeApiKeyRequestObject) (ConsoleRevokeApiKeyResponseObject, error)
 
+	// (POST /v1/console/client-errors)
+	ConsoleReportClientError(ctx context.Context, request ConsoleReportClientErrorRequestObject) (ConsoleReportClientErrorResponseObject, error)
+
+	// (GET /v1/console/memberships)
+	ConsoleListMemberships(ctx context.Context, request ConsoleListMembershipsRequestObject) (ConsoleListMembershipsResponseObject, error)
+
 	// (GET /v1/console/staff)
 	ConsoleListStaff(ctx context.Context, request ConsoleListStaffRequestObject) (ConsoleListStaffResponseObject, error)
+
+	// (POST /v1/console/staff)
+	ConsoleInviteStaff(ctx context.Context, request ConsoleInviteStaffRequestObject) (ConsoleInviteStaffResponseObject, error)
 
 	// (DELETE /v1/console/staff/{staff_id})
 	ConsoleDeleteStaff(ctx context.Context, request ConsoleDeleteStaffRequestObject) (ConsoleDeleteStaffResponseObject, error)
 
 	// (PATCH /v1/console/staff/{staff_id})
 	ConsoleUpdateStaff(ctx context.Context, request ConsoleUpdateStaffRequestObject) (ConsoleUpdateStaffResponseObject, error)
+
+	// (POST /v1/console/staff/{staff_id}/resend-invitation)
+	ConsoleResendStaffInvitation(ctx context.Context, request ConsoleResendStaffInvitationRequestObject) (ConsoleResendStaffInvitationResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -1039,6 +1503,61 @@ func (sh *strictHandler) ConsoleRevokeApiKey(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// ConsoleReportClientError operation middleware
+func (sh *strictHandler) ConsoleReportClientError(w http.ResponseWriter, r *http.Request) {
+	var request ConsoleReportClientErrorRequestObject
+
+	var body ConsoleReportClientErrorJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConsoleReportClientError(ctx, request.(ConsoleReportClientErrorRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConsoleReportClientError")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConsoleReportClientErrorResponseObject); ok {
+		if err := validResponse.VisitConsoleReportClientErrorResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConsoleListMemberships operation middleware
+func (sh *strictHandler) ConsoleListMemberships(w http.ResponseWriter, r *http.Request) {
+	var request ConsoleListMembershipsRequestObject
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConsoleListMemberships(ctx, request.(ConsoleListMembershipsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConsoleListMemberships")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConsoleListMembershipsResponseObject); ok {
+		if err := validResponse.VisitConsoleListMembershipsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
 // ConsoleListStaff operation middleware
 func (sh *strictHandler) ConsoleListStaff(w http.ResponseWriter, r *http.Request, params ConsoleListStaffParams) {
 	var request ConsoleListStaffRequestObject
@@ -1058,6 +1577,37 @@ func (sh *strictHandler) ConsoleListStaff(w http.ResponseWriter, r *http.Request
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ConsoleListStaffResponseObject); ok {
 		if err := validResponse.VisitConsoleListStaffResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConsoleInviteStaff operation middleware
+func (sh *strictHandler) ConsoleInviteStaff(w http.ResponseWriter, r *http.Request) {
+	var request ConsoleInviteStaffRequestObject
+
+	var body ConsoleInviteStaffJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConsoleInviteStaff(ctx, request.(ConsoleInviteStaffRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConsoleInviteStaff")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConsoleInviteStaffResponseObject); ok {
+		if err := validResponse.VisitConsoleInviteStaffResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {
@@ -1092,10 +1642,11 @@ func (sh *strictHandler) ConsoleDeleteStaff(w http.ResponseWriter, r *http.Reque
 }
 
 // ConsoleUpdateStaff operation middleware
-func (sh *strictHandler) ConsoleUpdateStaff(w http.ResponseWriter, r *http.Request, staffId StaffIDPath) {
+func (sh *strictHandler) ConsoleUpdateStaff(w http.ResponseWriter, r *http.Request, staffId StaffIDPath, params ConsoleUpdateStaffParams) {
 	var request ConsoleUpdateStaffRequestObject
 
 	request.StaffId = staffId
+	request.Params = params
 
 	var body ConsoleUpdateStaffJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -1117,6 +1668,32 @@ func (sh *strictHandler) ConsoleUpdateStaff(w http.ResponseWriter, r *http.Reque
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(ConsoleUpdateStaffResponseObject); ok {
 		if err := validResponse.VisitConsoleUpdateStaffResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// ConsoleResendStaffInvitation operation middleware
+func (sh *strictHandler) ConsoleResendStaffInvitation(w http.ResponseWriter, r *http.Request, staffId StaffIDPath) {
+	var request ConsoleResendStaffInvitationRequestObject
+
+	request.StaffId = staffId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.ConsoleResendStaffInvitation(ctx, request.(ConsoleResendStaffInvitationRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "ConsoleResendStaffInvitation")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(ConsoleResendStaffInvitationResponseObject); ok {
+		if err := validResponse.VisitConsoleResendStaffInvitationResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

@@ -115,6 +115,8 @@ type Service interface {
 	GetStaffRole(ctx context.Context, tenantID sk.TenantID, subject string) (Role, error)
 	// ListOwnerContacts は integration から呼ばれる。owner 全員を作成順で返す。テナントがなければ ErrTenantNotFound。
 	ListOwnerContacts(ctx context.Context, tenantID sk.TenantID) ([]OwnerContact, error)
+	// GetStaffContact は integration から呼ばれる（スタッフ宛ての通知の宛先。business-console §2）。なければ ErrStaffNotFound。
+	GetStaffContact(ctx context.Context, tenantID sk.TenantID, staffID string) (OwnerContact, error)
 }
 
 var (
@@ -127,7 +129,25 @@ var (
 const (
 	EventTenantApproved  = "tenant.approved"
 	EventTenantSuspended = "tenant.suspended"
+	// EventStaffAdded は有効な Cognito アカウントの人を事業者に追加した（integration が通知メールを送る。business-console §3）
+	EventStaffAdded = "tenant.staff_added"
+	// EventStaffInvited は新しく招待した・招待を再送した（拡張口。招待メールは Cognito が送る）
+	EventStaffInvited = "tenant.staff_invited"
 )
+
+// StaffAddedPayload は tenant.staff_added の payload（メールアドレスは入れない。宛先は GetStaffContact で解決する）。
+type StaffAddedPayload struct {
+	TenantID sk.TenantID `json:"tenant_id"`
+	StaffID  string      `json:"staff_id"`
+	Role     Role        `json:"role"`
+}
+
+// StaffInvitedPayload は tenant.staff_invited の payload。
+type StaffInvitedPayload struct {
+	TenantID sk.TenantID `json:"tenant_id"`
+	StaffID  string      `json:"staff_id"`
+	Resent   bool        `json:"resent"`
+}
 
 // TenantApprovedPayload は tenant.approved の payload。
 type TenantApprovedPayload struct {

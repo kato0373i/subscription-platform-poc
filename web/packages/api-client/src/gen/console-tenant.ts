@@ -4,6 +4,54 @@
  */
 
 export interface paths {
+    "/v1/console/memberships": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["consoleListMemberships"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/console/client-errors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["consoleReportClientError"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/console/staff/{staff_id}/resend-invitation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["consoleResendStaffInvitation"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/console/staff": {
         parameters: {
             query?: never;
@@ -13,7 +61,7 @@ export interface paths {
         };
         get: operations["consoleListStaff"];
         put?: never;
-        post?: never;
+        post: operations["consoleInviteStaff"];
         delete?: never;
         options?: never;
         head?: never;
@@ -81,8 +129,29 @@ export interface components {
             email: string;
             display_name: string;
             role: components["schemas"]["Role"];
+            /** @enum {string} */
+            status: "invited" | "active";
+            /** @description 招待中で、招待から 7 日を過ぎている */
+            invitation_expired: boolean;
+            /** Format: date-time */
+            invited_at: string | null;
+            /** Format: date-time */
+            last_seen_at: string | null;
+            version: number;
             /** Format: date-time */
             created_at: string;
+        };
+        Membership: {
+            /** Format: uuid */
+            tenant_id: string;
+            tenant_name: string;
+            /** @enum {string} */
+            tenant_status: "pending_review" | "active" | "suspended";
+            role: components["schemas"]["Role"];
+            /** @enum {string} */
+            staff_status: "invited" | "active";
+            /** @description このロールで使える操作（identity §3.4 の Permission） */
+            permissions: string[];
         };
         ApiKey: {
             /** Format: uuid */
@@ -135,6 +204,84 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    consoleListMemberships: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description ログイン中のスタッフが所属する事業者（事業者名の順） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Membership"][];
+                    };
+                };
+            };
+            401: components["responses"]["Problem"];
+        };
+    };
+    consoleReportClientError: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    message: string;
+                    stack?: string;
+                    url?: string;
+                    tenant_id?: string;
+                    correlation_id?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 記録した */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
+    consoleResendStaffInvitation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                staff_id: components["parameters"]["StaffIDPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 招待を再送した（アカウントがすでに有効なら所属を有効にした） */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Staff"];
+                };
+            };
+            403: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     consoleListStaff: {
         parameters: {
             query?: {
@@ -165,6 +312,38 @@ export interface operations {
             403: components["responses"]["Problem"];
         };
     };
+    consoleInviteStaff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    email: string;
+                    display_name: string;
+                    role: components["schemas"]["Role"];
+                };
+            };
+        };
+        responses: {
+            /** @description 招待したスタッフ（新しいアカウントは invited、有効なアカウントの人は active） */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Staff"];
+                };
+            };
+            400: components["responses"]["Problem"];
+            403: components["responses"]["Problem"];
+            409: components["responses"]["Problem"];
+            503: components["responses"]["Problem"];
+        };
+    };
     consoleDeleteStaff: {
         parameters: {
             query?: never;
@@ -191,7 +370,10 @@ export interface operations {
     consoleUpdateStaff: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 楽観ロック（スタッフの version） */
+                "If-Match"?: string;
+            };
             path: {
                 staff_id: components["parameters"]["StaffIDPath"];
             };

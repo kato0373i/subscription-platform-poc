@@ -107,6 +107,9 @@ type DunningPolicy struct {
 	IsDefault        bool       `json:"is_default"`
 	RetryOffsetsDays []int      `json:"retry_offsets_days"`
 	UpdatedAt        *time.Time `json:"updated_at"`
+
+	// Version 未設定（既定）は 0
+	Version int `json:"version"`
 }
 
 // Invoice defines model for Invoice.
@@ -201,6 +204,12 @@ type ConsolePutDunningPolicyJSONBody struct {
 	RetryOffsetsDays []int `json:"retry_offsets_days"`
 }
 
+// ConsolePutDunningPolicyParams defines parameters for ConsolePutDunningPolicy.
+type ConsolePutDunningPolicyParams struct {
+	// IfMatch 楽観ロック（version。未設定の既定は 0。business-console FR-015）
+	IfMatch *string `json:"If-Match,omitempty"`
+}
+
 // ConsoleListInvoicesParams defines parameters for ConsoleListInvoices.
 type ConsoleListInvoicesParams struct {
 	Limit *CommonLimit `form:"limit,omitempty" json:"limit,omitempty"`
@@ -219,7 +228,7 @@ type ServerInterface interface {
 	ConsoleGetDunningPolicy(w http.ResponseWriter, r *http.Request)
 
 	// (PUT /v1/console/dunning-policy)
-	ConsolePutDunningPolicy(w http.ResponseWriter, r *http.Request)
+	ConsolePutDunningPolicy(w http.ResponseWriter, r *http.Request, params ConsolePutDunningPolicyParams)
 
 	// (GET /v1/console/invoices/{invoice_id})
 	ConsoleGetInvoice(w http.ResponseWriter, r *http.Request, invoiceId openapi_types.UUID)
@@ -254,8 +263,35 @@ func (siw *ServerInterfaceWrapper) ConsoleGetDunningPolicy(w http.ResponseWriter
 // ConsolePutDunningPolicy operation middleware
 func (siw *ServerInterfaceWrapper) ConsolePutDunningPolicy(w http.ResponseWriter, r *http.Request) {
 
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ConsolePutDunningPolicyParams
+
+	headers := r.Header
+
+	// ------------- Optional header parameter "If-Match" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("If-Match")]; found {
+		var IfMatch string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "If-Match", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "If-Match", valueList[0], &IfMatch, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "If-Match", Err: err})
+			return
+		}
+
+		params.IfMatch = &IfMatch
+
+	}
+
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		siw.Handler.ConsolePutDunningPolicy(w, r)
+		siw.Handler.ConsolePutDunningPolicy(w, r, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -498,7 +534,8 @@ func (response ConsoleGetDunningPolicy200JSONResponse) VisitConsoleGetDunningPol
 }
 
 type ConsolePutDunningPolicyRequestObject struct {
-	Body *ConsolePutDunningPolicyJSONRequestBody
+	Params ConsolePutDunningPolicyParams
+	Body   *ConsolePutDunningPolicyJSONRequestBody
 }
 
 type ConsolePutDunningPolicyResponseObject interface {
@@ -710,8 +747,10 @@ func (sh *strictHandler) ConsoleGetDunningPolicy(w http.ResponseWriter, r *http.
 }
 
 // ConsolePutDunningPolicy operation middleware
-func (sh *strictHandler) ConsolePutDunningPolicy(w http.ResponseWriter, r *http.Request) {
+func (sh *strictHandler) ConsolePutDunningPolicy(w http.ResponseWriter, r *http.Request, params ConsolePutDunningPolicyParams) {
 	var request ConsolePutDunningPolicyRequestObject
+
+	request.Params = params
 
 	var body ConsolePutDunningPolicyJSONRequestBody
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {

@@ -11,6 +11,7 @@ import (
 	sk "subscription-platform/internal/sharedkernel"
 	"subscription-platform/modules/tenant/contracts"
 	tenanthttp "subscription-platform/modules/tenant/internal/adapter/http"
+	"subscription-platform/modules/tenant/internal/adapter/identity"
 	"subscription-platform/modules/tenant/internal/app"
 )
 
@@ -21,12 +22,23 @@ type Deps struct {
 	Outbox  []outbox.WriterOption
 	Cursors *httpx.CursorCodec
 	Rand    io.Reader // 省略時は crypto/rand
+	// Identity はスタッフの認証基盤（Cognito）。nil なら開発用（メールを送らず、subject はメールアドレスから決める）
+	Identity IdentityProvider
+	// AllowDirectSubject は ops のスタッフ作成で subject の直接指定を受け付けるか（devtools ビルドだけ true）
+	AllowDirectSubject bool
 }
+
+// IdentityProvider はスタッフのアカウントの操作（cmd が Cognito の実装を渡す）。
+type IdentityProvider = identity.Provider
+
+// CognitoIdentity は Cognito のスタッフのプールの実装。
+type CognitoIdentity = identity.Cognito
 
 // Module は tenant モジュール。
 type Module struct {
-	svc     *app.Service
-	cursors *httpx.CursorCodec
+	svc          *app.Service
+	cursors      *httpx.CursorCodec
+	allowSubject bool
 }
 
 // Name はスキーマ名。
@@ -38,12 +50,14 @@ func New(d Deps) *Module {
 	if r == nil {
 		r = rand.Reader
 	}
-	svc := app.New(d.Pool.Module(Name), outbox.NewWriter(Name, d.Clock, d.Outbox...), d.Clock, r)
-	return &Module{svc: svc, cursors: d.Cursors}
+	svc := app.New(d.Pool.Module(Name), outbox.NewWriter(Name, d.Clock, d.Outbox...), d.Clock, r, d.Identity)
+	return &Module{svc: svc, cursors: d.Cursors, allowSubject: d.AllowDirectSubject}
 }
 
 // Service は他モジュールと cmd に公開する API。
 func (m *Module) Service() contracts.Service { return m.svc }
 
 // MountHTTP は ops・console のルートを登録する。
-func (m *Module) MountHTTP(r *httpx.Router) error { return tenanthttp.Register(r, m.svc, m.cursors) }
+func (m *Module) MountHTTP(r *httpx.Router) error {
+	return tenanthttp.Register(r, m.svc, m.cursors, tenanthttp.Options{AllowDirectSubject: m.allowSubject})
+}

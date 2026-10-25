@@ -101,6 +101,8 @@ export interface components {
         DunningPolicy: {
             retry_offsets_days: number[];
             is_default: boolean;
+            /** @description 未設定（既定）は 0 */
+            version: number;
             /** Format: date-time */
             updated_at: string | null;
         };
@@ -238,7 +240,10 @@ export interface operations {
     consolePutDunningPolicy: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 楽観ロック（version。未設定の既定は 0。business-console FR-015） */
+                "If-Match"?: string;
+            };
             path?: never;
             cookie?: never;
         };

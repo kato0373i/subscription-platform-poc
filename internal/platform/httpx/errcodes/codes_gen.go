@@ -115,6 +115,12 @@ const (
 	WebhookDeliveryInProgress Code = "webhook_delivery_in_progress"
 	// WebhookEndpointUnavailable は Webhook の送信先が無効または削除されています（409、owner: integration）。
 	WebhookEndpointUnavailable Code = "webhook_endpoint_unavailable"
+	// StaffAlreadyMember は このメールアドレスのスタッフはすでに所属しています（409、owner: tenant）。
+	StaffAlreadyMember Code = "staff_already_member"
+	// StaffNotInvited は 招待中のスタッフではありません（409、owner: tenant）。
+	StaffNotInvited Code = "staff_not_invited"
+	// IdentityProviderUnavailable は 認証基盤に接続できません（503、owner: tenant）。
+	IdentityProviderUnavailable Code = "identity_provider_unavailable"
 )
 
 // Info はコードの HTTP ステータスと題名。
@@ -180,6 +186,9 @@ var All = map[Code]Info{
 	WebhookEndpointLimitExceeded: {Status: 409, Title: "Webhook の送信先の上限に達しています", Owner: "integration"},
 	WebhookDeliveryInProgress:    {Status: 409, Title: "同じイベントの配信が再試行待ちです", Owner: "integration"},
 	WebhookEndpointUnavailable:   {Status: 409, Title: "Webhook の送信先が無効または削除されています", Owner: "integration"},
+	StaffAlreadyMember:           {Status: 409, Title: "このメールアドレスのスタッフはすでに所属しています", Owner: "tenant"},
+	StaffNotInvited:              {Status: 409, Title: "招待中のスタッフではありません", Owner: "tenant"},
+	IdentityProviderUnavailable:  {Status: 503, Title: "認証基盤に接続できません", Owner: "tenant"},
 }
 
 // Status はコードの HTTP ステータス（未登録なら 500）。

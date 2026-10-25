@@ -429,7 +429,8 @@ func (s *Service) Policy(ctx context.Context, t sk.TenantID) (domain.DunningPoli
 }
 
 // UpdatePolicy は方針を保存する（DP-1〜DP-3 を検証）。監査の注釈に変更前後の offsets を残す（P-X-2）。
-func (s *Service) UpdatePolicy(ctx context.Context, t sk.TenantID, offsets []int, by string) (domain.DunningPolicy, error) {
+// expected は If-Match（任意。未設定の既定は 0）。違えば postgres.ErrVersionConflict（business-console FR-015）。
+func (s *Service) UpdatePolicy(ctx context.Context, t sk.TenantID, offsets []int, by string, expected *int) (domain.DunningPolicy, error) {
 	if err := domain.ValidateOffsets(offsets); err != nil {
 		return domain.DunningPolicy{}, err
 	}
@@ -439,6 +440,9 @@ func (s *Service) UpdatePolicy(ctx context.Context, t sk.TenantID, offsets []int
 		var err error
 		if before, err = repo.GetPolicy(ctx, t); err != nil {
 			return err
+		}
+		if expected != nil && *expected != before.Version {
+			return postgres.ErrVersionConflict
 		}
 		after, err = repo.UpsertPolicy(ctx, t, offsets, by, s.d.Clock.Now())
 		return err

@@ -128,6 +128,15 @@ export interface components {
             email: string;
             display_name: string;
             role: components["schemas"]["Role"];
+            /** @enum {string} */
+            status: "invited" | "active";
+            /** @description 招待中で、招待から 7 日を過ぎている */
+            invitation_expired: boolean;
+            /** Format: date-time */
+            invited_at: string | null;
+            /** Format: date-time */
+            last_seen_at: string | null;
+            version: number;
             /** Format: date-time */
             created_at: string;
         };
@@ -309,7 +318,8 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    subject: string;
+                    /** @description devtools ビルドだけ受け付ける（開発用 JWT の主体を直接登録する E2E の準備用）。省略すると招待（business-console §5） */
+                    subject?: string;
                     email: string;
                     display_name: string;
                     role: components["schemas"]["Role"];

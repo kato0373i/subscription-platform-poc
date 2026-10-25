@@ -5,6 +5,8 @@ import (
 	"context"
 	"errors"
 	nethttp "net/http"
+	"strconv"
+	"strings"
 
 	"github.com/google/uuid"
 
@@ -120,7 +122,7 @@ type consoleHandlers struct {
 var _ console.StrictServerInterface = (*consoleHandlers)(nil)
 
 func toProduct(s domain.ProductState) console.Product {
-	return console.Product{Id: s.ID.UUID(), Name: s.Name, Description: s.Description, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt}
+	return console.Product{Id: s.ID.UUID(), Name: s.Name, Description: s.Description, Version: s.Version, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt}
 }
 
 func toPrice(v domain.PriceVersion) console.PriceVersion {
@@ -131,8 +133,20 @@ func toPlan(s domain.PlanState) console.Plan {
 	return console.Plan{
 		Id: s.ID.UUID(), ProductId: s.ProductID.UUID(), Name: s.Name, Description: s.Description, BillingInterval: console.PlanBillingInterval(s.Interval),
 		TrialDays: s.TrialDays, PricingScheme: console.PlanPricingScheme(s.Scheme), Status: console.PlanStatus(s.Status), CurrentPrice: toPrice(s.CurrentPrice),
-		PublishedAt: s.PublishedAt, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
+		PublishedAt: s.PublishedAt, Version: s.Version, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt,
 	}
+}
+
+// ifMatch は If-Match（version の数値。弱い ETag の W/"…" も受ける）を読む。
+func ifMatch(v *string) (*int, error) {
+	if v == nil || *v == "" {
+		return nil, nil
+	}
+	n, err := strconv.Atoi(strings.Trim(*v, `W/"`))
+	if err != nil {
+		return nil, httpx.Error(errcodes.ValidationFailed, "If-Match must be the version", httpx.FieldError{Field: "If-Match", Code: "invalid"})
+	}
+	return &n, nil
 }
 
 func toCoupon(s domain.CouponState) console.Coupon {
@@ -189,7 +203,11 @@ func (h *consoleHandlers) ConsoleGetProduct(ctx context.Context, req console.Con
 }
 
 func (h *consoleHandlers) ConsoleUpdateProduct(ctx context.Context, req console.ConsoleUpdateProductRequestObject) (console.ConsoleUpdateProductResponseObject, error) {
-	st, err := h.svc.UpdateProduct(ctx, sk.IDFromUUID[contracts.ProductTag](req.ProductId), req.Body.Name, req.Body.Description)
+	v, err := ifMatch(req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.svc.UpdateProduct(ctx, sk.IDFromUUID[contracts.ProductTag](req.ProductId), req.Body.Name, req.Body.Description, v)
 	if err != nil {
 		return nil, problem(err)
 	}
@@ -254,7 +272,11 @@ func (h *consoleHandlers) ConsoleGetPlan(ctx context.Context, req console.Consol
 
 func (h *consoleHandlers) ConsoleUpdatePlan(ctx context.Context, req console.ConsoleUpdatePlanRequestObject) (console.ConsoleUpdatePlanResponseObject, error) {
 	b := req.Body
-	st, err := h.svc.UpdatePlan(ctx, sk.IDFromUUID[contracts.PlanTag](req.PlanId), b.Name, b.Description, b.TrialDays)
+	v, err := ifMatch(req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.svc.UpdatePlan(ctx, sk.IDFromUUID[contracts.PlanTag](req.PlanId), b.Name, b.Description, b.TrialDays, v)
 	if err != nil {
 		return nil, problem(err)
 	}

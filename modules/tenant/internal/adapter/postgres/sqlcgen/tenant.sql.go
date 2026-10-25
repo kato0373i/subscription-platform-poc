@@ -24,9 +24,10 @@ func (q *Queries) CountActiveApiKeys(ctx context.Context, tenantID uuid.UUID) (i
 }
 
 const countOwners = `-- name: CountOwners :one
-SELECT count(*) FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner'
+SELECT count(*) FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner' AND status = 'active'
 `
 
+// 最後のオーナーの判定は有効なオーナーだけで数える（招待中は数えない。business-console §3）
 func (q *Queries) CountOwners(ctx context.Context, tenantID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countOwners, tenantID)
 	var count int64
@@ -93,7 +94,7 @@ func (q *Queries) GetApiKey(ctx context.Context, id uuid.UUID) (TenantApiKey, er
 }
 
 const getStaff = `-- name: GetStaff :one
-SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at FROM tenant.staff_members WHERE id = $1
+SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at, status, invited_at, last_seen_at FROM tenant.staff_members WHERE id = $1
 `
 
 func (q *Queries) GetStaff(ctx context.Context, id uuid.UUID) (TenantStaffMember, error) {
@@ -109,12 +110,44 @@ func (q *Queries) GetStaff(ctx context.Context, id uuid.UUID) (TenantStaffMember
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
+		&i.InvitedAt,
+		&i.LastSeenAt,
+	)
+	return i, err
+}
+
+const getStaffByEmail = `-- name: GetStaffByEmail :one
+SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at, status, invited_at, last_seen_at FROM tenant.staff_members WHERE tenant_id = $1 AND email = $2
+`
+
+type GetStaffByEmailParams struct {
+	TenantID uuid.UUID
+	Email    string
+}
+
+func (q *Queries) GetStaffByEmail(ctx context.Context, arg GetStaffByEmailParams) (TenantStaffMember, error) {
+	row := q.db.QueryRow(ctx, getStaffByEmail, arg.TenantID, arg.Email)
+	var i TenantStaffMember
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Subject,
+		&i.Email,
+		&i.DisplayName,
+		&i.Role,
+		&i.Version,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.Status,
+		&i.InvitedAt,
+		&i.LastSeenAt,
 	)
 	return i, err
 }
 
 const getStaffBySubject = `-- name: GetStaffBySubject :one
-SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at FROM tenant.staff_members WHERE tenant_id = $1 AND subject = $2
+SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at, status, invited_at, last_seen_at FROM tenant.staff_members WHERE tenant_id = $1 AND subject = $2
 `
 
 type GetStaffBySubjectParams struct {
@@ -135,6 +168,9 @@ func (q *Queries) GetStaffBySubject(ctx context.Context, arg GetStaffBySubjectPa
 		&i.Version,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Status,
+		&i.InvitedAt,
+		&i.LastSeenAt,
 	)
 	return i, err
 }
@@ -212,8 +248,8 @@ func (q *Queries) InsertApiKey(ctx context.Context, arg InsertApiKeyParams) erro
 }
 
 const insertStaff = `-- name: InsertStaff :exec
-INSERT INTO tenant.staff_members (id, tenant_id, subject, email, display_name, role, version, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, 1, $7, $7)
+INSERT INTO tenant.staff_members (id, tenant_id, subject, email, display_name, role, status, invited_at, version, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 1, $9, $9)
 `
 
 type InsertStaffParams struct {
@@ -223,6 +259,8 @@ type InsertStaffParams struct {
 	Email       string
 	DisplayName string
 	Role        string
+	Status      string
+	InvitedAt   *time.Time
 	CreatedAt   time.Time
 }
 
@@ -234,6 +272,8 @@ func (q *Queries) InsertStaff(ctx context.Context, arg InsertStaffParams) error 
 		arg.Email,
 		arg.DisplayName,
 		arg.Role,
+		arg.Status,
+		arg.InvitedAt,
 		arg.CreatedAt,
 	)
 	return err
@@ -312,8 +352,56 @@ func (q *Queries) ListApiKeys(ctx context.Context, arg ListApiKeysParams) ([]Ten
 	return items, nil
 }
 
+const listMembershipsBySubject = `-- name: ListMembershipsBySubject :many
+SELECT s.id, s.tenant_id, s.role, s.status, s.invited_at, s.last_seen_at, t.name AS tenant_name, t.status AS tenant_status
+  FROM tenant.staff_members s JOIN tenant.tenants t ON t.id = s.tenant_id
+ WHERE s.subject = $1
+ ORDER BY t.name, t.id
+`
+
+type ListMembershipsBySubjectRow struct {
+	ID           uuid.UUID
+	TenantID     uuid.UUID
+	Role         string
+	Status       string
+	InvitedAt    *time.Time
+	LastSeenAt   *time.Time
+	TenantName   string
+	TenantStatus string
+}
+
+// 所属する事業者の一覧（全事業者を横断する。system スコープで呼ぶ）
+func (q *Queries) ListMembershipsBySubject(ctx context.Context, subject string) ([]ListMembershipsBySubjectRow, error) {
+	rows, err := q.db.Query(ctx, listMembershipsBySubject, subject)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListMembershipsBySubjectRow
+	for rows.Next() {
+		var i ListMembershipsBySubjectRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Role,
+			&i.Status,
+			&i.InvitedAt,
+			&i.LastSeenAt,
+			&i.TenantName,
+			&i.TenantStatus,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOwners = `-- name: ListOwners :many
-SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner' ORDER BY created_at, id
+SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at, status, invited_at, last_seen_at FROM tenant.staff_members WHERE tenant_id = $1 AND role = 'owner' ORDER BY created_at, id
 `
 
 func (q *Queries) ListOwners(ctx context.Context, tenantID uuid.UUID) ([]TenantStaffMember, error) {
@@ -335,6 +423,9 @@ func (q *Queries) ListOwners(ctx context.Context, tenantID uuid.UUID) ([]TenantS
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Status,
+			&i.InvitedAt,
+			&i.LastSeenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -347,7 +438,7 @@ func (q *Queries) ListOwners(ctx context.Context, tenantID uuid.UUID) ([]TenantS
 }
 
 const listStaff = `-- name: ListStaff :many
-SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at FROM tenant.staff_members
+SELECT id, tenant_id, subject, email, display_name, role, version, created_at, updated_at, status, invited_at, last_seen_at FROM tenant.staff_members
 WHERE tenant_id = $1
   AND ($3::timestamptz IS NULL
        OR (created_at, id) > ($3::timestamptz, $4::uuid))
@@ -386,6 +477,9 @@ func (q *Queries) ListStaff(ctx context.Context, arg ListStaffParams) ([]TenantS
 			&i.Version,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Status,
+			&i.InvitedAt,
+			&i.LastSeenAt,
 		); err != nil {
 			return nil, err
 		}
@@ -465,6 +559,30 @@ func (q *Queries) RevokeApiKey(ctx context.Context, arg RevokeApiKeyParams) (int
 		return 0, err
 	}
 	return result.RowsAffected(), nil
+}
+
+const updateStaffLifecycle = `-- name: UpdateStaffLifecycle :exec
+UPDATE tenant.staff_members SET status = $2, invited_at = $3, last_seen_at = $4, updated_at = $5 WHERE id = $1
+`
+
+type UpdateStaffLifecycleParams struct {
+	ID         uuid.UUID
+	Status     string
+	InvitedAt  *time.Time
+	LastSeenAt *time.Time
+	UpdatedAt  time.Time
+}
+
+// 招待中の再送・有効化・最終利用日時（version は事業者の編集の楽観ロックなので上げない）
+func (q *Queries) UpdateStaffLifecycle(ctx context.Context, arg UpdateStaffLifecycleParams) error {
+	_, err := q.db.Exec(ctx, updateStaffLifecycle,
+		arg.ID,
+		arg.Status,
+		arg.InvitedAt,
+		arg.LastSeenAt,
+		arg.UpdatedAt,
+	)
+	return err
 }
 
 const updateStaffRole = `-- name: UpdateStaffRole :execrows

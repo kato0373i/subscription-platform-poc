@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/lestrrat-go/httprc/v3"
 	"github.com/lestrrat-go/jwx/v3/jwa"
 	"github.com/lestrrat-go/jwx/v3/jwk"
 	"github.com/lestrrat-go/jwx/v3/jws"
@@ -155,14 +156,19 @@ type CognitoVerifier struct {
 	urls  map[UserPool]string
 }
 
-// NewCognitoVerifier は JWKS のキャッシュを作る。jwksURL が空ならプールの issuer から作る。
+// NewCognitoVerifier は JWKS のキャッシュを作る。jwksURL が空ならプールの issuer から作る（MiniStack では上書きする）。
+// issuer が空のプールは登録しない（devtools ビルドでスタッフのプールだけ Cognito を受けるため）。
 func NewCognitoVerifier(ctx context.Context, pools map[UserPool]PoolSettings, jwksURLs map[UserPool]string) (*CognitoVerifier, error) {
-	c, err := jwk.NewCache(ctx, nil)
+	c, err := jwk.NewCache(ctx, httprc.NewClient()) // nil を渡すと jwx v3 は起動時に panic する
 	if err != nil {
 		return nil, fmt.Errorf("httpx: jwk cache: %w", err)
 	}
-	v := &CognitoVerifier{pools: pools, cache: c, urls: map[UserPool]string{}}
+	v := &CognitoVerifier{pools: map[UserPool]PoolSettings{}, cache: c, urls: map[UserPool]string{}}
 	for p, set := range pools {
+		if set.Issuer == "" {
+			continue
+		}
+		v.pools[p] = set
 		u := jwksURLs[p]
 		if u == "" {
 			u = strings.TrimSuffix(set.Issuer, "/") + "/.well-known/jwks.json"
@@ -185,4 +191,37 @@ func (v *CognitoVerifier) Verify(ctx context.Context, raw string, pool UserPool)
 		return Claims{}, fmt.Errorf("%w: jwks: %v", ErrInvalidToken, err) //nolint:errorlint
 	}
 	return verifyWith(raw, set, jwt.WithKeySet(keys, jws.WithInferAlgorithmFromKey(true)))
+}
+
+// Issuers は検証できる発行元（MultiVerifier の振り分けに使う）。
+func (v *CognitoVerifier) Issuers() []string {
+	out := make([]string, 0, len(v.pools))
+	for _, set := range v.pools {
+		out = append(out, set.Issuer)
+	}
+	return out
+}
+
+// MultiVerifier は JWT の iss で検証器を選ぶ（devtools ビルドで開発用 JWT と Cognito の ID トークンを両方受ける。ADR-C04）。
+// 振り分けのために iss を読むだけで、署名・期限・aud の検証は選んだ検証器が行う。
+type MultiVerifier struct {
+	byIssuer map[string]TokenVerifier
+}
+
+// NewMultiVerifier は issuer → 検証器の対応から作る。
+func NewMultiVerifier(byIssuer map[string]TokenVerifier) *MultiVerifier {
+	return &MultiVerifier{byIssuer: byIssuer}
+}
+
+func (m *MultiVerifier) Verify(ctx context.Context, raw string, pool UserPool) (Claims, error) {
+	tok, err := jwt.ParseInsecure([]byte(raw))
+	if err != nil {
+		return Claims{}, fmt.Errorf("%w: %v", ErrInvalidToken, err) //nolint:errorlint
+	}
+	iss, _ := tok.Issuer()
+	v, ok := m.byIssuer[iss]
+	if !ok {
+		return Claims{}, fmt.Errorf("%w: unknown issuer", ErrInvalidToken)
+	}
+	return v.Verify(ctx, raw, pool)
 }

@@ -45,7 +45,8 @@ func (s *Service) GetProduct(ctx context.Context, id contracts.ProductID) (domai
 	return st, err
 }
 
-func (s *Service) UpdateProduct(ctx context.Context, id contracts.ProductID, name, desc *string) (domain.ProductState, error) {
+// expected は If-Match（任意）。違えば postgres.ErrVersionConflict（business-console FR-015）。
+func (s *Service) UpdateProduct(ctx context.Context, id contracts.ProductID, name, desc *string, expected *int) (domain.ProductState, error) {
 	var before, after domain.ProductState
 	var changed bool
 	err := s.d.DB.InTx(ctx, func(ctx context.Context, tx db.Tx) error {
@@ -55,6 +56,9 @@ func (s *Service) UpdateProduct(ctx context.Context, id contracts.ProductID, nam
 			return mapNotFound(err, ErrNotFound)
 		}
 		before = p.State()
+		if expected != nil && *expected != before.Version {
+			return postgres.ErrVersionConflict
+		}
 		if changed, err = p.Rename(name, desc); err != nil || !changed {
 			after = p.State()
 			return err
@@ -183,8 +187,12 @@ func (s *Service) withPlan(ctx context.Context, id contracts.PlanID, fn func(ctx
 	return before, after, changed, err
 }
 
-func (s *Service) UpdatePlan(ctx context.Context, id contracts.PlanID, name, desc *string, trial *int) (domain.PlanState, error) {
+// expected は If-Match（任意）。違えば postgres.ErrVersionConflict（business-console FR-015）。
+func (s *Service) UpdatePlan(ctx context.Context, id contracts.PlanID, name, desc *string, trial *int, expected *int) (domain.PlanState, error) {
 	before, after, changed, err := s.withPlan(ctx, id, func(_ context.Context, _ db.Tx, _ *postgres.Repo, p *domain.Plan) (bool, error) {
+		if expected != nil && *expected != p.State().Version {
+			return false, postgres.ErrVersionConflict
+		}
 		return p.UpdateAttributes(name, desc, trial)
 	})
 	if err != nil {

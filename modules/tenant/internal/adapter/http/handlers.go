@@ -4,22 +4,34 @@ package http
 import (
 	"context"
 	"errors"
+	"log/slog"
 	nethttp "net/http"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
 
 	"subscription-platform/api/openapi"
 	"subscription-platform/internal/platform/httpx"
 	"subscription-platform/internal/platform/httpx/errcodes"
+	"subscription-platform/internal/platform/observability"
 	sk "subscription-platform/internal/sharedkernel"
 	"subscription-platform/modules/tenant/contracts"
 	"subscription-platform/modules/tenant/internal/adapter/http/gen/console"
 	"subscription-platform/modules/tenant/internal/adapter/http/gen/ops"
+	"subscription-platform/modules/tenant/internal/adapter/identity"
 	"subscription-platform/modules/tenant/internal/adapter/postgres"
 	"subscription-platform/modules/tenant/internal/app"
 	"subscription-platform/modules/tenant/internal/domain"
 )
 
+// Options は HTTP の設定。AllowDirectSubject は ops のスタッフ作成で subject の直接指定を受け付けるか（devtools ビルドだけ true）。
+type Options struct {
+	AllowDirectSubject bool
+}
+
 // Register は ops・console のルートを登録する。
-func Register(r *httpx.Router, svc *app.Service, codec *httpx.CursorCodec) error {
+func Register(r *httpx.Router, svc *app.Service, codec *httpx.CursorCodec, opt Options) error {
 	opsSpec, err := openapi.Load("ops/tenant.yaml")
 	if err != nil {
 		return err
@@ -28,14 +40,14 @@ func Register(r *httpx.Router, svc *app.Service, codec *httpx.CursorCodec) error
 	if err != nil {
 		return err
 	}
-	opsH := ops.NewStrictHandlerWithOptions(&opsHandlers{svc: svc, codec: codec}, nil,
+	opsH := ops.NewStrictHandlerWithOptions(&opsHandlers{svc: svc, codec: codec, allowSubject: opt.AllowDirectSubject}, nil,
 		ops.StrictHTTPServerOptions{RequestErrorHandlerFunc: httpx.StrictRequestError, ResponseErrorHandlerFunc: httpx.StrictResponseError})
 	if err := r.Mount(opsSpec, func(m httpx.ServeMux) {
 		ops.HandlerWithOptions(opsH, ops.StdHTTPServerOptions{BaseRouter: m, ErrorHandlerFunc: httpx.StrictRequestError})
 	}); err != nil {
 		return err
 	}
-	consoleH := console.NewStrictHandlerWithOptions(&consoleHandlers{svc: svc, codec: codec}, nil,
+	consoleH := console.NewStrictHandlerWithOptions(&consoleHandlers{svc: svc, codec: codec, errLimit: newLimiter(30, time.Minute)}, nil,
 		console.StrictHTTPServerOptions{RequestErrorHandlerFunc: httpx.StrictRequestError, ResponseErrorHandlerFunc: httpx.StrictResponseError})
 	return r.Mount(consoleSpec, func(m httpx.ServeMux) {
 		console.HandlerWithOptions(consoleH, console.StdHTTPServerOptions{BaseRouter: m, ErrorHandlerFunc: httpx.StrictRequestError})
@@ -66,8 +78,26 @@ func problem(err error) error {
 		return httpx.Error(errcodes.NotFound, "")
 	case errors.Is(err, postgres.ErrVersionConflict):
 		return httpx.Error(errcodes.Conflict, "")
+	case errors.Is(err, app.ErrStaffAlreadyMember):
+		return httpx.Error(errcodes.StaffAlreadyMember, "")
+	case errors.Is(err, domain.ErrNotInvited):
+		return httpx.Error(errcodes.StaffNotInvited, "")
+	case errors.Is(err, identity.ErrUnavailable):
+		return httpx.Error(errcodes.IdentityProviderUnavailable, "")
 	}
 	return err
+}
+
+// ifMatch は If-Match（version の数値。弱い ETag の W/"…" も受ける）を読む。
+func ifMatch(v *string) (*int, error) {
+	if v == nil || *v == "" {
+		return nil, nil
+	}
+	n, err := strconv.Atoi(strings.Trim(*v, `W/"`))
+	if err != nil {
+		return nil, httpx.Error(errcodes.ValidationFailed, "If-Match must be the version", httpx.FieldError{Field: "If-Match", Code: "invalid"})
+	}
+	return &n, nil
 }
 
 func pageLimit(l *int) int {
@@ -92,8 +122,9 @@ func decodeCursor[T any](codec *httpx.CursorCodec, s *string) (*T, error) {
 // ---- ops ----
 
 type opsHandlers struct {
-	svc   *app.Service
-	codec *httpx.CursorCodec
+	svc          *app.Service
+	codec        *httpx.CursorCodec
+	allowSubject bool
 }
 
 var _ ops.StrictServerInterface = (*opsHandlers)(nil)
@@ -163,28 +194,98 @@ func (h *opsHandlers) OpsSuspendTenant(ctx context.Context, req ops.OpsSuspendTe
 	return ops.OpsSuspendTenant200JSONResponse(toOpsTenant(st)), nil
 }
 
+// OpsCreateStaff は最初のオーナーなどの登録。subject を省略すると招待（Cognito でアカウントを作る）。subject の指定は devtools ビルドだけ。
 func (h *opsHandlers) OpsCreateStaff(ctx context.Context, req ops.OpsCreateStaffRequestObject) (ops.OpsCreateStaffResponseObject, error) {
 	b := req.Body
-	st, err := h.svc.CreateStaff(ctx, sk.IDFromUUID[sk.TenantTag](req.TenantId), b.Subject, b.Email, b.DisplayName, contracts.Role(b.Role))
+	tid := sk.IDFromUUID[sk.TenantTag](req.TenantId)
+	var st domain.StaffState
+	var err error
+	switch {
+	case b.Subject != nil && h.allowSubject:
+		st, err = h.svc.CreateStaff(ctx, tid, *b.Subject, b.Email, b.DisplayName, contracts.Role(b.Role))
+	case b.Subject != nil:
+		return nil, httpx.Error(errcodes.ValidationFailed, "subject is not accepted", httpx.FieldError{Field: "subject", Code: "not_allowed"})
+	default:
+		st, err = h.svc.InviteStaff(ctx, tid, b.Email, b.DisplayName, contracts.Role(b.Role))
+	}
 	if err != nil {
 		return nil, problem(err)
 	}
+	s := toStaff(st, h.svc.Now())
 	return ops.OpsCreateStaff201JSONResponse{
-		Id: st.ID.UUID(), Subject: st.Subject, Email: st.Email, DisplayName: st.DisplayName, Role: ops.ConsoleTenantRole(st.Role), CreatedAt: st.CreatedAt,
+		Id: s.Id, Subject: s.Subject, Email: s.Email, DisplayName: s.DisplayName, Role: ops.ConsoleTenantRole(s.Role), Status: ops.ConsoleTenantStaffStatus(s.Status),
+		InvitationExpired: s.InvitationExpired, InvitedAt: s.InvitedAt, LastSeenAt: s.LastSeenAt, Version: s.Version, CreatedAt: s.CreatedAt,
 	}, nil
 }
 
 // ---- console ----
 
 type consoleHandlers struct {
-	svc   *app.Service
-	codec *httpx.CursorCodec
+	svc      *app.Service
+	codec    *httpx.CursorCodec
+	errLimit *limiter
 }
 
 var _ console.StrictServerInterface = (*consoleHandlers)(nil)
 
-func toStaff(s domain.StaffState) console.Staff {
-	return console.Staff{Id: s.ID.UUID(), Subject: s.Subject, Email: s.Email, DisplayName: s.DisplayName, Role: console.Role(s.Role), CreatedAt: s.CreatedAt}
+func toStaff(s domain.StaffState, now time.Time) console.Staff {
+	return console.Staff{
+		Id: s.ID.UUID(), Subject: s.Subject, Email: s.Email, DisplayName: s.DisplayName, Role: console.Role(s.Role), Status: console.StaffStatus(s.Status),
+		InvitationExpired: s.InvitationExpired(now), InvitedAt: s.InvitedAt, LastSeenAt: s.LastSeenAt, Version: s.Version, CreatedAt: s.CreatedAt,
+	}
+}
+
+func (h *consoleHandlers) ConsoleListMemberships(ctx context.Context, _ console.ConsoleListMembershipsRequestObject) (console.ConsoleListMembershipsResponseObject, error) {
+	ms, err := h.svc.ListMemberships(ctx, subjectOf(ctx))
+	if err != nil {
+		return nil, problem(err)
+	}
+	resp := console.ConsoleListMemberships200JSONResponse{Data: make([]console.Membership, len(ms))}
+	for i, m := range ms {
+		perms := make([]string, len(m.Permissions))
+		for j, p := range m.Permissions {
+			perms[j] = string(p)
+		}
+		resp.Data[i] = console.Membership{
+			TenantId: m.TenantID.UUID(), TenantName: m.TenantName, TenantStatus: console.MembershipTenantStatus(m.TenantStatus), Role: console.Role(m.Role),
+			StaffStatus: console.MembershipStaffStatus(m.StaffStatus), Permissions: perms,
+		}
+	}
+	return resp, nil
+}
+
+// ConsoleReportClientError は画面の JavaScript のエラーをログに書く（NFR-009）。スタッフごとに 1 分 30 件まで。
+func (h *consoleHandlers) ConsoleReportClientError(ctx context.Context, req console.ConsoleReportClientErrorRequestObject) (console.ConsoleReportClientErrorResponseObject, error) {
+	sub := subjectOf(ctx)
+	if !h.errLimit.allow(sub, h.svc.Now()) {
+		return console.ConsoleReportClientError204Response{}, nil // 上限を超えた分は捨てる（画面の動作は止めない）
+	}
+	b := req.Body
+	attrs := []slog.Attr{slog.String("staff_subject", sub), slog.String("message", b.Message)}
+	for k, v := range map[string]*string{"stack": b.Stack, "url": b.Url, "tenant_id": b.TenantId, "client_correlation_id": b.CorrelationId} {
+		if v != nil {
+			attrs = append(attrs, slog.String(k, *v))
+		}
+	}
+	observability.Logger("console.client").LogAttrs(ctx, slog.LevelWarn, "console.client_error", attrs...)
+	return console.ConsoleReportClientError204Response{}, nil
+}
+
+func (h *consoleHandlers) ConsoleInviteStaff(ctx context.Context, req console.ConsoleInviteStaffRequestObject) (console.ConsoleInviteStaffResponseObject, error) {
+	b := req.Body
+	st, err := h.svc.InviteStaff(ctx, httpx.TenantID(ctx), b.Email, b.DisplayName, contracts.Role(b.Role))
+	if err != nil {
+		return nil, problem(err)
+	}
+	return console.ConsoleInviteStaff201JSONResponse(toStaff(st, h.svc.Now())), nil
+}
+
+func (h *consoleHandlers) ConsoleResendStaffInvitation(ctx context.Context, req console.ConsoleResendStaffInvitationRequestObject) (console.ConsoleResendStaffInvitationResponseObject, error) {
+	st, err := h.svc.ResendInvitation(ctx, httpx.TenantID(ctx), sk.IDFromUUID[domain.StaffTag](req.StaffId))
+	if err != nil {
+		return nil, problem(err)
+	}
+	return console.ConsoleResendStaffInvitation202JSONResponse(toStaff(st, h.svc.Now())), nil
 }
 
 func subjectOf(ctx context.Context) string {
@@ -203,7 +304,7 @@ func (h *consoleHandlers) ConsoleListStaff(ctx context.Context, req console.Cons
 	}
 	resp := console.ConsoleListStaff200JSONResponse{Data: make([]console.Staff, len(list)), HasMore: more}
 	for i, s := range list {
-		resp.Data[i] = toStaff(s)
+		resp.Data[i] = toStaff(s, h.svc.Now())
 	}
 	if more {
 		last := list[len(list)-1]
@@ -214,11 +315,15 @@ func (h *consoleHandlers) ConsoleListStaff(ctx context.Context, req console.Cons
 }
 
 func (h *consoleHandlers) ConsoleUpdateStaff(ctx context.Context, req console.ConsoleUpdateStaffRequestObject) (console.ConsoleUpdateStaffResponseObject, error) {
-	st, err := h.svc.ChangeStaffRole(ctx, httpx.TenantID(ctx), sk.IDFromUUID[domain.StaffTag](req.StaffId), contracts.Role(req.Body.Role))
+	v, err := ifMatch(req.Params.IfMatch)
+	if err != nil {
+		return nil, err
+	}
+	st, err := h.svc.ChangeStaffRole(ctx, httpx.TenantID(ctx), sk.IDFromUUID[domain.StaffTag](req.StaffId), contracts.Role(req.Body.Role), v)
 	if err != nil {
 		return nil, problem(err)
 	}
-	return console.ConsoleUpdateStaff200JSONResponse(toStaff(st)), nil
+	return console.ConsoleUpdateStaff200JSONResponse(toStaff(st, h.svc.Now())), nil
 }
 
 func (h *consoleHandlers) ConsoleDeleteStaff(ctx context.Context, req console.ConsoleDeleteStaffRequestObject) (console.ConsoleDeleteStaffResponseObject, error) {
@@ -287,4 +392,36 @@ func (h *consoleHandlers) ConsoleRevokeApiKey(ctx context.Context, req console.C
 		return nil, problem(err)
 	}
 	return console.ConsoleRevokeApiKey204Response{}, nil
+}
+
+// limiter はスタッフごとの固定窓の件数制限（画面のエラーの収集用。プロセスの中だけで数える）。
+type limiter struct {
+	mu     sync.Mutex
+	max    int
+	window time.Duration
+	seen   map[string]*window
+}
+
+type window struct {
+	start time.Time
+	n     int
+}
+
+func newLimiter(max int, w time.Duration) *limiter {
+	return &limiter{max: max, window: w, seen: map[string]*window{}}
+}
+
+func (l *limiter) allow(key string, now time.Time) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	w, ok := l.seen[key]
+	if !ok || now.Sub(w.start) >= l.window {
+		if len(l.seen) > 10000 {
+			l.seen = map[string]*window{} // 古い窓を捨てる（メモリの上限）
+		}
+		l.seen[key] = &window{start: now, n: 1}
+		return true
+	}
+	w.n++
+	return w.n <= l.max
 }

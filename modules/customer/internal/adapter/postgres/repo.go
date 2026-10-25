@@ -129,3 +129,12 @@ func (r *Repo) InsertLinkIfAbsent(ctx context.Context, linkID contracts.TenantCu
 	_, err := r.q.InsertLinkIfAbsent(ctx, sqlcgen.InsertLinkIfAbsentParams{ID: string(linkID), TenantID: t.UUID(), CustomerAccountID: id.UUID(), CreatedAt: now})
 	return err
 }
+
+// GetActiveAccountIDByEmail は有効なアカウントの ID（メールアドレスの完全一致。system スコープで呼ぶ）。
+func (r *Repo) GetActiveAccountIDByEmail(ctx context.Context, email string) (sk.CustomerAccountID, error) {
+	id, err := r.q.GetActiveAccountIDByEmail(ctx, &email)
+	if err != nil {
+		return sk.CustomerAccountID{}, notFound(err)
+	}
+	return sk.IDFromUUID[sk.CustomerAccountTag](id), nil
+}

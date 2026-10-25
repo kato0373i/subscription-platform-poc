@@ -271,3 +271,18 @@ codes:
     title: Webhook の送信先が無効または削除されています
     owner: integration
     description: disabled・削除済みの送信先への手動再送
+  - code: staff_already_member
+    status: 409
+    title: このメールアドレスのスタッフはすでに所属しています
+    owner: tenant
+    description: 同じ事業者に同じメールアドレスのスタッフがいる（招待。business-console FR-006）
+  - code: staff_not_invited
+    status: 409
+    title: 招待中のスタッフではありません
+    owner: tenant
+    description: 招待中でないスタッフへの招待の再送
+  - code: identity_provider_unavailable
+    status: 503
+    title: 認証基盤に接続できません
+    owner: tenant
+    description: Cognito への要求（招待・再送）が失敗した

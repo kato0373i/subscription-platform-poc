@@ -54,7 +54,10 @@ export type ErrorCode =
   | "billing_run_in_progress"
   | "webhook_endpoint_limit_exceeded"
   | "webhook_delivery_in_progress"
-  | "webhook_endpoint_unavailable";
+  | "webhook_endpoint_unavailable"
+  | "staff_already_member"
+  | "staff_not_invited"
+  | "identity_provider_unavailable";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -111,4 +114,7 @@ export const errorStatus: Record<ErrorCode, number> = {
   webhook_endpoint_limit_exceeded: 409,
   webhook_delivery_in_progress: 409,
   webhook_endpoint_unavailable: 409,
+  staff_already_member: 409,
+  staff_not_invited: 409,
+  identity_provider_unavailable: 503,
 };

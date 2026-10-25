@@ -157,6 +157,7 @@ export interface components {
             id: string;
             name: string;
             description: string;
+            version: number;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -194,6 +195,7 @@ export interface components {
             current_price: components["schemas"]["PriceVersion"];
             /** Format: date-time */
             published_at: string | null;
+            version: number;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -261,6 +263,8 @@ export interface components {
         ProductIDPath: string;
         PlanIDPath: string;
         CouponIDPath: string;
+        /** @description 楽観ロック（version。business-console FR-015） */
+        IfMatch: string;
         Limit: number;
         /** @description 前のページの next_cursor */
         StartingAfter: string;
@@ -355,7 +359,10 @@ export interface operations {
     consoleUpdateProduct: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 楽観ロック（version。business-console FR-015） */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
             path: {
                 product_id: components["parameters"]["ProductIDPath"];
             };
@@ -478,7 +485,10 @@ export interface operations {
     consoleUpdatePlan: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                /** @description 楽観ロック（version。business-console FR-015） */
+                "If-Match"?: components["parameters"]["IfMatch"];
+            };
             path: {
                 plan_id: components["parameters"]["PlanIDPath"];
             };

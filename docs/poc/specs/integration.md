@@ -181,6 +181,7 @@
 |---|---|---|---|
 | `tenant.create` / `tenant.approve` / `tenant.suspend` | ops | status（suspend は reason も） | Identity |
 | `staff.create` / `staff.update_role` / `staff.delete` | console・ops | role | Identity |
+| `staff.invite` / `staff.resend_invitation` | console・ops | after：staff_id・role・status（メールアドレス・subject は入れない）。business-console FR-006・FR-007 | Identity |
 | `api_key.create` / `api_key.revoke` | console | key_prefix、status | Identity |
 | `product.create` / `product.update` | console | 変更した項目 | Catalog |
 | `plan.create` / `plan.update` | console | 変更した項目 | Catalog |
@@ -682,6 +683,7 @@ integration から見た要件。項目名とポートは TL-Platform の platfo
 | 2026-10-13 | 実行基盤を ECS Fargate に戻した改訂（P-ARC-10・11、P-X-7）について PdM の最終確認を経て、Fixed とする | PdM |
 | 2026-10-13 | テストの方針の変更を反映（P-TST-1〜7）。§11 に、テストの方針、`webhook-sink` の要件（WS-1〜8。実装は TL-Platform）、メールの確かめ方（MiniStack の SES から取り出す方法は要検証。代わりに `email_notifications` の status・dedupe_key・variables を DB で確かめる）を追加。U3 を `WEBHOOK_INSECURE_ALLOWED_HOSTS` に置き換え、`webhook-sink` を許可。`email_notifications` に `subject` を追加し、送信時の変数を書き足すようにした。`RecordingMailer` を削除し `MAIL_MODE` を定義。AC-INT-001〜040 のレベルを unit・integration・e2e で付け直し、フェイク前提の記述をなくした。e2e の行に、確かめる場所（シナリオの番号、または `e2e/tests/integration/*.spec.ts`・`e2e/tests/audit/*.spec.ts`）を付け、時刻を進めるものは `.clock.spec.ts` に分けた（P-TST-8・9）。ステータスを Review に戻す | TL-Integration（Claude） |
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
+| 2026-10-26 | §3.6.1 に `staff.invite`・`staff.resend_invitation` を追加（business-console、P-IMP-22） | PdM |
 
 ## 付録 A. DDL
 

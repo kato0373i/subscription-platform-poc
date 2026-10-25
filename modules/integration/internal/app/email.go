@@ -20,6 +20,7 @@ import (
 	"subscription-platform/modules/integration/internal/adapter/postgres"
 	"subscription-platform/modules/integration/internal/adapter/postgres/sqlcgen"
 	"subscription-platform/modules/integration/internal/domain"
+	tenant "subscription-platform/modules/tenant/contracts"
 )
 
 const (
@@ -153,6 +154,18 @@ func (s *Service) compose(ctx context.Context, t sk.TenantID, row sqlcgen.Integr
 		if c.Name == "" {
 			personal["customer_name"] = "お客"
 		}
+	case domain.RecipientStaff:
+		c, err := s.d.Tenant.GetStaffContact(cctx, t, row.StaffID.String())
+		switch {
+		case errors.Is(err, tenant.ErrStaffNotFound):
+			return nil, nil, errSkip // 送る前に所属を削除された
+		case err != nil:
+			return nil, nil, errTemporary{"staff: " + err.Error()}
+		}
+		to = []string{c.Email}
+		personal["staff_name"] = c.DisplayName
+		resolved["console_url"] = s.d.URLs.Console
+		resolved["role_label"] = roleLabel(fmt.Sprint(vars["role"]))
 	case domain.RecipientTenantOwner:
 		owners, err := s.d.Tenant.ListOwnerContacts(cctx, t)
 		if err != nil {
@@ -258,4 +271,15 @@ func truncate(s string, n int) string {
 		return s
 	}
 	return s[:n]
+}
+
+func roleLabel(role string) string {
+	switch role {
+	case "owner":
+		return "オーナー"
+	case "admin":
+		return "管理者"
+	default:
+		return "閲覧者"
+	}
 }

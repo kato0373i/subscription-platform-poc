@@ -116,6 +116,14 @@ type Subscription struct {
 	CreatedAt     time.Time                 `json:"created_at"`
 	CurrentPeriod MeSubscriptionPeriod      `json:"current_period"`
 
+	// Customer 事業者に渡してよい範囲の契約者情報（上位 FR-009）。退会済みなら name・email は null
+	Customer struct {
+		Email     *string `json:"email"`
+		Id        string  `json:"id"`
+		Name      *string `json:"name"`
+		Withdrawn bool    `json:"withdrawn"`
+	} `json:"customer"`
+
 	// CustomerId 事業者ごとの契約者 ID（cus_…）
 	CustomerId            string                               `json:"customer_id"`
 	Entitled              bool                                 `json:"entitled"`
@@ -193,7 +201,10 @@ type ConsoleListSubscriptionsParams struct {
 	Status     *[]MeSubscriptionStatus `form:"status,omitempty" json:"status,omitempty"`
 	PlanId     *openapi_types.UUID     `form:"plan_id,omitempty" json:"plan_id,omitempty"`
 	CustomerId *string                 `form:"customer_id,omitempty" json:"customer_id,omitempty"`
-	Limit      *CommonLimit            `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Email 契約者のメールアドレス（完全一致。business-console FR-010）
+	Email *string      `form:"email,omitempty" json:"email,omitempty"`
+	Limit *CommonLimit `form:"limit,omitempty" json:"limit,omitempty"`
 
 	// StartingAfter 前のページの next_cursor
 	StartingAfter *CommonStartingAfter `form:"starting_after,omitempty" json:"starting_after,omitempty"`
@@ -262,6 +273,19 @@ func (siw *ServerInterfaceWrapper) ConsoleListSubscriptions(w http.ResponseWrite
 			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "customer_id"})
 		} else {
 			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customer_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "email" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "email", r.URL.Query(), &params.Email, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "email"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "email", Err: err})
 		}
 		return
 	}

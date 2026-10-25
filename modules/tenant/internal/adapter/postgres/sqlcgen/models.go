@@ -33,6 +33,9 @@ type TenantStaffMember struct {
 	Version     int32
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	Status      string
+	InvitedAt   *time.Time
+	LastSeenAt  *time.Time
 }
 
 type TenantTenant struct {

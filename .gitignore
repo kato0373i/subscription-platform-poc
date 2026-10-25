@@ -17,3 +17,7 @@ node_modules/
 /bin/
 *.test
 *.out
+
+# 事業者コンソール（SPA）
+web/console/dist
+web/console/public/config.json

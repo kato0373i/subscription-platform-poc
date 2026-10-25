@@ -11,6 +11,7 @@ paths:
         - {name: status, in: query, style: form, explode: true, schema: {type: array, items: {$ref: '../me/subscription.yaml#/components/schemas/Status'}}}
         - {name: plan_id, in: query, schema: {type: string, format: uuid}}
         - {name: customer_id, in: query, schema: {type: string, pattern: '^cus_[0-9A-Za-z]{24}$'}}
+        - {name: email, in: query, description: 契約者のメールアドレス（完全一致。business-console FR-010）, schema: {type: string, maxLength: 254}}
         - {$ref: '../common.yaml#/components/parameters/Limit'}
         - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
       responses:
@@ -40,11 +41,20 @@ components:
   schemas:
     Subscription:
       type: object
-      required: [id, customer_id, product_id, plan_id, price_version_id, interval, quantity, status, entitled, current_period, next_renewal_date, trial,
+      required: [id, customer_id, customer, product_id, plan_id, price_version_id, interval, quantity, status, entitled, current_period, next_renewal_date, trial,
         scheduled_plan_change, scheduled_cancellation, renewal_in_progress, cancel_reason, canceled_at, created_at]
       properties:
         id: {type: string, format: uuid}
         customer_id: {type: string, description: 事業者ごとの契約者 ID（cus_…）}
+        customer:
+          type: object
+          description: 事業者に渡してよい範囲の契約者情報（上位 FR-009）。退会済みなら name・email は null
+          required: [id, name, email, withdrawn]
+          properties:
+            id: {type: string}
+            name: {type: string, nullable: true}
+            email: {type: string, nullable: true}
+            withdrawn: {type: boolean}
         product_id: {type: string, format: uuid}
         plan_id: {type: string, format: uuid}
         price_version_id: {type: string, format: uuid}

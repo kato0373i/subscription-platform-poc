@@ -5,6 +5,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"strings"
 
 	"subscription-platform/internal/platform/db"
 	"subscription-platform/internal/platform/observability"
@@ -266,4 +267,19 @@ func (s *Service) GetTenantCustomerProfile(ctx context.Context, tenantID sk.Tena
 		return nil
 	})
 	return p, err
+}
+
+// FindTenantCustomerIDByEmail は contracts.Service（事業者コンソールの契約の検索。business-console FR-010）。
+func (s *Service) FindTenantCustomerIDByEmail(ctx context.Context, tenantID sk.TenantID, email string) (contracts.TenantCustomerID, error) {
+	e := strings.ToLower(strings.TrimSpace(email))
+	var id sk.CustomerAccountID
+	err := s.db.ReadTx(db.WithSystemScope(db.ClearScope(ctx), "console customer search"), func(ctx context.Context, tx db.Tx) error {
+		var err error
+		id, err = postgres.New(tx).GetActiveAccountIDByEmail(ctx, e)
+		return mapNotFound(err, contracts.ErrLinkNotFound)
+	})
+	if err != nil {
+		return "", err
+	}
+	return s.ResolveTenantCustomerID(db.ClearScope(ctx), tenantID, id)
 }

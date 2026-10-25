@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -67,6 +69,8 @@ func Problem(err error) *httpx.Problem {
 		return httpx.Error(errcodes.CollectionInProgress, "")
 	case errors.As(err, &dp):
 		return httpx.Error(errcodes.ValidationFailed, err.Error(), httpx.FieldError{Field: "retry_offsets_days", Code: dp.Code})
+	case errors.Is(err, postgres.ErrVersionConflict):
+		return httpx.Error(errcodes.Conflict, "")
 	case errors.Is(err, c.ErrValidation):
 		return httpx.Error(errcodes.ValidationFailed, err.Error())
 	}
@@ -233,7 +237,7 @@ func policyJSON(p domain.DunningPolicy) map[string]any {
 	if offs == nil {
 		offs = []int{}
 	}
-	return map[string]any{"retry_offsets_days": offs, "is_default": p.IsDefault, "updated_at": p.UpdatedAt}
+	return map[string]any{"retry_offsets_days": offs, "is_default": p.IsDefault, "version": p.Version, "updated_at": p.UpdatedAt}
 }
 
 func (h consoleHandlers) ConsoleGetDunningPolicy(ctx context.Context, _ console.ConsoleGetDunningPolicyRequestObject) (console.ConsoleGetDunningPolicyResponseObject, error) {
@@ -246,7 +250,15 @@ func (h consoleHandlers) ConsoleGetDunningPolicy(ctx context.Context, _ console.
 
 func (h consoleHandlers) ConsolePutDunningPolicy(ctx context.Context, req console.ConsolePutDunningPolicyRequestObject) (console.ConsolePutDunningPolicyResponseObject, error) {
 	pr, _ := httpx.PrincipalFrom(ctx)
-	p, err := h.svc.UpdatePolicy(ctx, httpx.TenantID(ctx), req.Body.RetryOffsetsDays, pr.Subject)
+	var expected *int
+	if v := req.Params.IfMatch; v != nil && *v != "" {
+		n, err := strconv.Atoi(strings.Trim(*v, `W/"`))
+		if err != nil {
+			return nil, httpx.Error(errcodes.ValidationFailed, "If-Match must be the version", httpx.FieldError{Field: "If-Match", Code: "invalid"})
+		}
+		expected = &n
+	}
+	p, err := h.svc.UpdatePolicy(ctx, httpx.TenantID(ctx), req.Body.RetryOffsetsDays, pr.Subject, expected)
 	if err != nil {
 		return nil, problem(err)
 	}

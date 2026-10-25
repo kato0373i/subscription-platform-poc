@@ -29,7 +29,7 @@ func TestMain(m *testing.M) {
 var clock = sk.NewManualClock(time.Date(2026, 10, 24, 1, 0, 0, 0, time.UTC))
 
 func newService(d *pgtest.DB) *app.Service {
-	return app.New(d.Pool.Module("tenant"), outbox.NewWriter("tenant", clock), clock, rand.Reader)
+	return app.New(d.Pool.Module("tenant"), outbox.NewWriter("tenant", clock), clock, rand.Reader, nil)
 }
 
 func ops() context.Context { return db.WithSystemScope(context.Background(), "operator") }
@@ -99,7 +99,7 @@ func TestConcurrentDemotionKeepsOneOwner(t *testing.T) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				_, errs[i] = svc.ChangeStaffRole(console(tid), tid, target.ID, contracts.RoleAdmin)
+				_, errs[i] = svc.ChangeStaffRole(console(tid), tid, target.ID, contracts.RoleAdmin, nil)
 			}()
 		}
 		wg.Wait()

@@ -321,11 +321,11 @@ func TestDunningPolicy(t *testing.T) {
 	if err != nil || !p.IsDefault || len(p.Offsets) != 3 {
 		t.Fatalf("default: %+v %v", p, err)
 	}
-	if _, err := f.svc.UpdatePolicy(context.Background(), cmd.TenantID, []int{2, 5}, "staff-1"); err != nil {
+	if _, err := f.svc.UpdatePolicy(context.Background(), cmd.TenantID, []int{2, 5}, "staff-1", nil); err != nil {
 		t.Fatal(err)
 	}
 	var pe *c.InvalidDunningPolicyError
-	if _, err := f.svc.UpdatePolicy(context.Background(), cmd.TenantID, []int{1, 1}, "staff-1"); !errors.As(err, &pe) {
+	if _, err := f.svc.UpdatePolicy(context.Background(), cmd.TenantID, []int{1, 1}, "staff-1", nil); !errors.As(err, &pe) {
 		t.Errorf("invalid: %v", err)
 	}
 	v, _ := f.svc.IssueInvoice(context.Background(), cmd)
@@ -337,7 +337,7 @@ func TestDunningPolicy(t *testing.T) {
 	if got.NextCollectionAt == nil || !got.NextCollectionAt.Equal(sk.MustDate(2026, 11, 17).AtJST(10, 0)) {
 		t.Errorf("next = %v", got.NextCollectionAt)
 	}
-	if _, err := f.svc.UpdatePolicy(context.Background(), cmd.TenantID, []int{1}, "staff-1"); err != nil {
+	if _, err := f.svc.UpdatePolicy(context.Background(), cmd.TenantID, []int{1}, "staff-1", nil); err != nil {
 		t.Fatal(err)
 	}
 	if n := f.count(t, `SELECT count(*) FROM billing.invoices WHERE dunning_schedule->'offsets_days' = '[2,5]'::jsonb AND dunning_schedule->>'policy_source' = 'tenant'`); n != 1 {

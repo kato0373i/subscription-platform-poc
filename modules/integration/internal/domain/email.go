@@ -18,12 +18,14 @@ const (
 	TmplCancellationScheduled = "cancellation_scheduled"
 	TmplSubscriptionCanceled  = "subscription_canceled"
 	TmplWebhookDeliveryFailed = "webhook_delivery_failed"
+	TmplStaffAdded            = "staff_added" // 既存の Cognito アカウントの人を事業者に追加した（business-console FR-006）
 )
 
 // EmailEventTypes は integration-email が購読する内部の event_type（deploy/messaging.yaml と一致させる）。
 var EmailEventTypes = []string{
 	"subscription.started", "subscription.trial_will_end", "subscription.renewed", "subscription.past_due",
 	"subscription.cancellation_scheduled", "subscription.canceled", "billing.invoice_issued", "billing.invoice_payment_failed", "customer.withdrawn",
+	"tenant.staff_added",
 }
 
 // Recipient は宛先の種類。
@@ -32,6 +34,7 @@ type Recipient string
 const (
 	RecipientCustomer    Recipient = "customer"
 	RecipientTenantOwner Recipient = "tenant_owner"
+	RecipientStaff       Recipient = "staff"
 )
 
 // EmailPlan は購読処理が作るメールの行（個人情報を含めない変数だけ）。
@@ -44,6 +47,7 @@ type EmailPlan struct {
 	SubscriptionID *sk.SubscriptionID
 	InvoiceID      *sk.InvoiceID
 	EndpointID     *EndpointID
+	StaffID        *string
 	Variables      map[string]any
 }
 
@@ -180,4 +184,13 @@ func EmailNextAttempt(createdAt, now time.Time, n int) (time.Time, bool) {
 		return time.Time{}, false
 	}
 	return next, true
+}
+
+// StaffAddedPlan はスタッフの追加の通知（宛先はスタッフ。1 つの所属に 1 通）。
+func StaffAddedPlan(tenant sk.TenantID, staffID, role string) *EmailPlan {
+	id := staffID
+	return &EmailPlan{
+		TemplateKey: TmplStaffAdded, DedupeKey: "staff_added:" + staffID, Recipient: RecipientStaff, TenantID: tenant, StaffID: &id,
+		Variables: map[string]any{"role": role},
+	}
 }

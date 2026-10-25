@@ -10,6 +10,10 @@ SELECT * FROM customer.customer_accounts WHERE id = $1 FOR SHARE;
 -- name: GetAccountBySubject :one
 SELECT * FROM customer.customer_accounts WHERE subject = $1;
 
+-- 事業者コンソールのメールアドレス検索（business-console FR-010。system スコープで呼び、リンクで事業者の範囲に絞る）
+-- name: GetActiveAccountIDByEmail :one
+SELECT id FROM customer.customer_accounts WHERE email = $1 AND status = 'active';
+
 -- name: ExistsActiveEmail :one
 SELECT EXISTS (SELECT 1 FROM customer.customer_accounts WHERE email = $1 AND status = 'active' AND subject <> $2);
 

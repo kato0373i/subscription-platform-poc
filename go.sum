@@ -75,6 +75,8 @@ github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.7 h1:wYu55QUHARwu9YzeuY5yEJUTsIu8
 github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.7/go.mod h1:OteEkhFAgFwQtZft/3myWo3tVWxdAo7cwV+7AbcpAtQ=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.90.2 h1:QffI1EfSpYRbRKRBjDrrZSmcjayVNAPctyY1tJjQj7Y=
 github.com/aws/aws-sdk-go-v2/service/cloudwatchlogs v1.90.2/go.mod h1:JNB9rtNgPAVmqs24X1w0l7kblyJVQupAf3HNOScOKyA=
+github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.75.5 h1:1lXDo7Q9+nIbRA3N2jNMVVy72xLhEp80MRrIu4j+dHY=
+github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider v1.75.5/go.mod h1:YICGKMw3CMnQMj3hNAzwFewM+IvSMEISeQZoJvmiYP8=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.55.5 h1:fPjZfSNHPyGpCvb7O5AdutYMXrzzP5X496PRzhCXzp0=
 github.com/aws/aws-sdk-go-v2/service/eventbridge v1.55.5/go.mod h1:Wegdzx+3ajWtfQrAlrhi+Cs/PuAHAb0xC8V7gs9MceU=
 github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.22 h1:qHfXn1Tm2Rh8kic/DvdKaiSVlHQRSr5C+rMuBR29D44=

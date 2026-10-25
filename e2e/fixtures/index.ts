@@ -40,7 +40,10 @@ export const test = base.extend<Fixtures>({
   // ブラウザのテストでも、API への要求に同じ相関 ID を付ける（page を使うテストだけで動く）
   page: async ({ page, logs }, use) => {
     const apiBase = process.env.API_BASE_URL ?? "http://localhost:8080";
-    await page.route(`${apiBase}/**`, (route) => route.continue({ headers: { ...route.request().headers(), "x-correlation-id": logs.correlationId } }));
+    const consoleBase = process.env.CONSOLE_BASE_URL ?? "http://localhost:8090";
+    const withCorr = (route: import("@playwright/test").Route) => route.continue({ headers: { ...route.request().headers(), "x-correlation-id": logs.correlationId } });
+    await page.route(`${apiBase}/**`, withCorr);
+    await page.route(`${consoleBase}/v1/**`, withCorr); // 事業者コンソール（同一オリジンの /v1/）
     await use(page);
   },
   tokens: async ({ api }, use, testInfo) => {
