@@ -74,3 +74,21 @@ sql:
         out: modules/orchestration/internal/adapter/postgres/sqlcgen
         sql_package: pgx/v5
         emit_pointers_for_null_types: true
+  - engine: postgresql
+    schema: [internal/platform/db/sqlc/schemas.sql, modules/integration/db/migrations]
+    queries: modules/integration/db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: modules/integration/internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+  - engine: postgresql
+    schema: [internal/platform/db/sqlc/schemas.sql, modules/audit/db/migrations]
+    queries: modules/audit/db/queries
+    gen:
+      go:
+        package: sqlcgen
+        out: modules/audit/internal/adapter/postgres/sqlcgen
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true

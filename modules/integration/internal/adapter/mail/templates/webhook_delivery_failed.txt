@@ -1,0 +1,10 @@
+【{{.tenant_name}}】Webhook の配信に失敗しました
+{{.tenant_name}} ご担当者様
+
+次の送信先への Webhook の配信が、再試行の期限（72 時間）を過ぎても成功しませんでした。
+
+送信先：{{.endpoint_url}}
+本日失敗した配信：{{.failed_count}} 件
+
+配信履歴の確認と再送はコンソールから行えます。
+{{.console_url}}

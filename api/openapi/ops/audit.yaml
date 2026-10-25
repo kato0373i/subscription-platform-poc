@@ -1,0 +1,59 @@
+# 運営者の監査記録の閲覧（integration.md §7.2、FR-025）。主体は operator。
+openapi: 3.0.3
+info: {title: ops-audit, version: "1"}
+paths:
+  /v1/ops/audit-records:
+    get:
+      operationId: opsListAuditRecords
+      parameters:
+        - {name: tenant_id, in: query, schema: {type: string, format: uuid}}
+        - {name: action, in: query, schema: {type: string, maxLength: 100}}
+        - {name: actor_id, in: query, schema: {type: string, maxLength: 255}}
+        - {name: occurred_from, in: query, schema: {type: string, format: date-time}}
+        - {name: occurred_to, in: query, schema: {type: string, format: date-time}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 監査記録（occurred_at の新しい順）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/AuditRecord'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  schemas:
+    AuditRecord:
+      type: object
+      required: [id, occurred_at, tenant_id, actor, action, target, before, after, outcome, request_id, correlation_id, http_method, route, source_ip]
+      properties:
+        id: {type: string, format: uuid}
+        occurred_at: {type: string, format: date-time}
+        tenant_id: {type: string, format: uuid, nullable: true}
+        actor:
+          type: object
+          required: [type, id, role]
+          properties:
+            type: {type: string, enum: [operator, staff, tenant_api, system]}
+            id: {type: string}
+            role: {type: string}
+        action: {type: string}
+        target:
+          type: object
+          required: [type, id]
+          properties:
+            type: {type: string}
+            id: {type: string}
+        before: {type: object, nullable: true, additionalProperties: true}
+        after: {type: object, nullable: true, additionalProperties: true}
+        outcome: {type: string, enum: [succeeded, denied]}
+        request_id: {type: string}
+        correlation_id: {type: string}
+        http_method: {type: string}
+        route: {type: string}
+        source_ip: {type: string, nullable: true}

@@ -303,7 +303,7 @@ func (x *Invoice) applyFailure(o Outcome, policy DunningPolicy, today sk.Date, n
 		x.emit(c.EventInvoicePaymentFailed, map[string]any{
 			"invoice_id": s.ID, "subscription_id": s.SubscriptionID, "attempt_no": seq, "collection_seq": seq, "next_collection_at": s.NextCollectionAt,
 			"failure_code": o.FailureCode, "retryable": o.Retryable, "dunning_stage": s.DunningStage, "attempt_id": o.AttemptID, "reason": reason,
-			"collection_mode": s.Mode, "remaining_retries": remaining,
+			"collection_mode": s.Mode, "remaining_retries": remaining, "amount": s.Total.Int64(),
 		})
 	}
 	if s.Mode == c.ModeCallerManaged || !reason.Scheduled() {

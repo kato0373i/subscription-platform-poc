@@ -1,0 +1,10 @@
+【重要】{{.tenant_name}} のお支払いができませんでした
+{{.customer_name}} 様
+
+{{.tenant_name}} のご利用料金 {{yen .amount}} のお支払いができませんでした。
+{{- if .next_collection_at}}
+{{datetime .next_collection_at}} に再度お支払いを試みます。
+{{- end}}
+
+お支払い方法を更新してください。
+{{.payment_method_update_url}}

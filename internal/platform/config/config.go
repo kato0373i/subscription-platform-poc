@@ -47,6 +47,12 @@ type Config struct {
 
 	WebhookInsecureAllowedHosts []string
 	MailMode                    string
+	MailFrom                    string
+	Webhook                     WebhookConfig
+	// メールのリンク（integration.md §5.3）。{subscription_id} を置き換える
+	PaymentMethodUpdateURLTemplate string
+	MypageURL                      string
+	ConsoleURL                     string
 
 	Log       observability.LogConfig
 	SlowQuery time.Duration
@@ -60,6 +66,17 @@ type Config struct {
 	FincodeSecretKey  string
 	FincodePublicKey  string
 	ShutdownSec       int
+}
+
+// WebhookConfig は事業者 Webhook の配信の設定（integration.md §8）。
+type WebhookConfig struct {
+	SecretEncKey     []byte        // WEBHOOK_SECRET_ENC_KEY（base64 の 32 バイト）
+	RetrySchedule    string        // WEBHOOK_RETRY_SCHEDULE（カンマ区切り、最後を繰り返す）
+	GiveUpAfter      time.Duration // WEBHOOK_GIVE_UP_AFTER
+	RetryJitter      float64       // WEBHOOK_RETRY_JITTER（0〜0.1）
+	BreakerThreshold int           // WEBHOOK_BREAKER_THRESHOLD
+	BreakerOpenFor   time.Duration // WEBHOOK_BREAKER_OPEN_FOR
+	Parallelism      int           // WEBHOOK_DISPATCH_PARALLELISM（1 タスクが同時に担当する送信先の数）
 }
 
 // Getenv は環境変数の取得元（テストで差し替える）。
@@ -166,6 +183,47 @@ func LoadFrom(service string, env Getenv, devtools bool) (Config, error) {
 		c.WebhookInsecureAllowedHosts = []string{"localhost", "127.0.0.1"}
 	}
 	c.MailMode = oneOf("MAIL_MODE", "ses", "ses", "log")
+	c.MailFrom = get("MAIL_FROM", "noreply@sp.local")
+	c.PaymentMethodUpdateURLTemplate = get("PAYMENT_METHOD_UPDATE_URL_TEMPLATE", "http://localhost:8080/checkout/?subscription={subscription_id}")
+	c.MypageURL = get("MYPAGE_URL", "http://localhost:8080/mypage/")
+	c.ConsoleURL = get("CONSOLE_URL", "http://localhost:8080/console/")
+	durationVar := func(k, def string) time.Duration {
+		d, err := time.ParseDuration(get(k, def))
+		if err != nil || d <= 0 {
+			errs = append(errs, fmt.Errorf("%s: invalid %q", k, get(k, def)))
+		}
+		return d
+	}
+	intVar := func(k, def string) int {
+		n, err := strconv.Atoi(get(k, def))
+		if err != nil || n < 1 {
+			errs = append(errs, fmt.Errorf("%s: invalid %q", k, get(k, def)))
+		}
+		return n
+	}
+	c.Webhook = WebhookConfig{
+		RetrySchedule:    get("WEBHOOK_RETRY_SCHEDULE", "1m,5m,30m,2h,5h,10h,12h"),
+		GiveUpAfter:      durationVar("WEBHOOK_GIVE_UP_AFTER", "72h"),
+		BreakerThreshold: intVar("WEBHOOK_BREAKER_THRESHOLD", "5"),
+		BreakerOpenFor:   durationVar("WEBHOOK_BREAKER_OPEN_FOR", "60s"),
+		Parallelism:      intVar("WEBHOOK_DISPATCH_PARALLELISM", "8"),
+	}
+	if j, err := strconv.ParseFloat(get("WEBHOOK_RETRY_JITTER", "0.1"), 64); err != nil || j < 0 || j > 0.1 {
+		errs = append(errs, fmt.Errorf("WEBHOOK_RETRY_JITTER: invalid %q (0〜0.1)", get("WEBHOOK_RETRY_JITTER", "0.1")))
+	} else {
+		c.Webhook.RetryJitter = j
+	}
+	if service == "api" || service == "worker-integration" {
+		raw := get("WEBHOOK_SECRET_ENC_KEY", "")
+		if raw == "" && devtools {
+			raw = "bG9jYWwtd2ViaG9vay1zZWNyZXQtZW5jLWtleS0zMmI=" // devtools ビルドだけの既定値（ローカル用の 32 バイト）
+		}
+		k, err := base64.StdEncoding.DecodeString(raw)
+		if err != nil || len(k) != 32 {
+			errs = append(errs, errors.New("WEBHOOK_SECRET_ENC_KEY must be 32 bytes encoded in base64"))
+		}
+		c.Webhook.SecretEncKey = k
+	}
 
 	defSinks, defBody := "stdout", "off"
 	if localEnv {

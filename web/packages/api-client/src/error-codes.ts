@@ -51,7 +51,10 @@ export type ErrorCode =
   | "subscription_not_modifiable"
   | "payment_method_in_use"
   | "has_open_subscriptions"
-  | "billing_run_in_progress";
+  | "billing_run_in_progress"
+  | "webhook_endpoint_limit_exceeded"
+  | "webhook_delivery_in_progress"
+  | "webhook_endpoint_unavailable";
 
 export const errorStatus: Record<ErrorCode, number> = {
   validation_failed: 400,
@@ -105,4 +108,7 @@ export const errorStatus: Record<ErrorCode, number> = {
   payment_method_in_use: 409,
   has_open_subscriptions: 409,
   billing_run_in_progress: 409,
+  webhook_endpoint_limit_exceeded: 409,
+  webhook_delivery_in_progress: 409,
+  webhook_endpoint_unavailable: 409,
 };

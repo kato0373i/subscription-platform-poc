@@ -77,3 +77,8 @@ jobs:
     process: worker-billing
     schedule: "cron(0 3 * * ? *)"
     dedupe: daily
+  # 期限の過ぎた前の署名鍵の消去（integration.md §8.5。毎日 04:00 JST）
+  - name: integration-webhook-secret-cleanup
+    process: worker-integration
+    schedule: "cron(0 4 * * ? *)"
+    dedupe: daily

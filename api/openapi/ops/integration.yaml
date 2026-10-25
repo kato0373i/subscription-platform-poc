@@ -1,0 +1,25 @@
+# 運営者の Webhook の配信履歴と手動再送（integration.md §7.2、NFR-014）。主体は operator。
+openapi: 3.0.3
+info: {title: ops-integration, version: "1"}
+paths:
+  /v1/ops/webhook-deliveries:
+    get:
+      operationId: opsListWebhookDeliveries
+      parameters:
+        - {name: tenant_id, in: query, required: true, schema: {type: string, format: uuid}}
+        - {name: endpoint_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [pending, succeeded, failed, abandoned]}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200": {$ref: '../console/integration.yaml#/components/responses/DeliveryList'}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/webhook-deliveries/{delivery_id}/redeliver:
+    post:
+      operationId: opsRedeliverWebhook
+      parameters:
+        - {$ref: '../console/integration.yaml#/components/parameters/DeliveryIDPath'}
+      responses:
+        "202": {description: 手動再送の新しい配信, content: {application/json: {schema: {$ref: '../console/integration.yaml#/components/schemas/Delivery'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}

@@ -72,3 +72,22 @@ queues:
     concurrency: 5
     visibility_timeout_s: 60
     max_receive: 5
+  # 事業者 Webhook の外部イベントの作成（integration.md §5.2）。送信は worker-integration の配信ループが行う
+  - name: integration-webhook
+    process: worker-integration
+    consumer: integration.webhook
+    events: [subscription.started, subscription.trial_will_end, subscription.renewed, subscription.past_due, subscription.recovered,
+      subscription.plan_change_scheduled, subscription.plan_change_revoked, subscription.plan_changed, subscription.cancellation_scheduled,
+      subscription.cancellation_revoked, subscription.canceled, billing.invoice_paid, billing.invoice_payment_failed]
+    concurrency: 10
+    visibility_timeout_s: 60
+    max_receive: 5
+  # 契約者メール（§5.3）。SES の送信レートに合わせて同時実行は 5
+  - name: integration-email
+    process: worker-integration
+    consumer: integration.email
+    events: [subscription.started, subscription.trial_will_end, subscription.renewed, subscription.past_due, subscription.cancellation_scheduled,
+      subscription.canceled, billing.invoice_issued, billing.invoice_payment_failed, customer.withdrawn]
+    concurrency: 5
+    visibility_timeout_s: 60
+    max_receive: 5

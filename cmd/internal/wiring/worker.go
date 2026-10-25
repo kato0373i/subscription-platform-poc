@@ -35,6 +35,13 @@ func RunWorker(process string) func(ctx context.Context, b *Base) error {
 		jobs = append(jobs, pj...)
 
 		var loops []func(context.Context) error
+		for _, m := range mods {
+			for _, l := range m.Loops {
+				if l.Process == process {
+					loops = append(loops, l.Run)
+				}
+			}
+		}
 		for _, q := range b.Topology.QueuesFor(process) {
 			p, err := processorFor(b, q, consumers, jobs, process)
 			if err != nil {

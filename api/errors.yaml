@@ -256,3 +256,18 @@ codes:
     title: 同じ課金日の投入が実行中です
     owner: orchestration
     description: 同じ課金日の BillingRun が dispatching
+  - code: webhook_endpoint_limit_exceeded
+    status: 409
+    title: Webhook の送信先の上限に達しています
+    owner: integration
+    description: 削除されていない送信先が 10 個ある（integration.md §3.1.2）
+  - code: webhook_delivery_in_progress
+    status: 409
+    title: 同じイベントの配信が再試行待ちです
+    owner: integration
+    description: 同じ送信先・同じイベントに pending の配信がある（手動再送の連打。E6）
+  - code: webhook_endpoint_unavailable
+    status: 409
+    title: Webhook の送信先が無効または削除されています
+    owner: integration
+    description: disabled・削除済みの送信先への手動再送

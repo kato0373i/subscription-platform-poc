@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/fs"
 
+	"github.com/aws/aws-sdk-go-v2/service/ses"
 	"github.com/google/uuid"
 
 	"subscription-platform/internal/platform/config"
@@ -13,12 +14,14 @@ import (
 	"subscription-platform/internal/platform/messaging"
 	"subscription-platform/internal/platform/scheduler"
 	sk "subscription-platform/internal/sharedkernel"
+	"subscription-platform/modules/audit"
 	"subscription-platform/modules/billing"
 	billingcontracts "subscription-platform/modules/billing/contracts"
 	"subscription-platform/modules/catalog"
 	catalogcontracts "subscription-platform/modules/catalog/contracts"
 	"subscription-platform/modules/customer"
 	customercontracts "subscription-platform/modules/customer/contracts"
+	"subscription-platform/modules/integration"
 	"subscription-platform/modules/orchestration"
 	"subscription-platform/modules/payments"
 	paymentscontracts "subscription-platform/modules/payments/contracts"
@@ -37,6 +40,13 @@ type ModuleSet struct {
 	Consumers  []messaging.ConsumerSpec
 	Jobs       []scheduler.Job
 	Ports      func(*httpx.Ports) // httpx に注入する関数（identity・audit）
+	Loops      []Loop             // 常駐ループ（Process のプロセスだけが動かす）
+}
+
+// Loop はプロセスに常駐するループ（配信ループなど）。
+type Loop struct {
+	Process string
+	Run     func(context.Context) error
 }
 
 // Services は組み立てたモジュールの contracts。
@@ -50,7 +60,7 @@ type Services struct {
 }
 
 // modules はプロセスに組み込むモジュール。マイグレーションの順序（tenant → … → audit）で並べる。
-func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
+func modules(_ context.Context, b *Base, process string) ([]ModuleSet, error) {
 	codec, err := httpx.NewCursorCodec(b.Cfg.CursorKey)
 	if err != nil {
 		return nil, fmt.Errorf("cursor codec: %w", err)
@@ -83,6 +93,24 @@ func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 			return res.RunID, err
 		},
 	})
+	var mailer integration.Mailer = integration.SESMailer{Client: ses.NewFromConfig(b.AWS), From: b.Cfg.MailFrom}
+	if b.Cfg.MailMode == "log" {
+		mailer = integration.LogMailer{}
+	}
+	var intg *integration.Module
+	if process == "api" || process == "worker-integration" {
+		w := b.Cfg.Webhook
+		intg, err = integration.New(integration.Deps{
+			Pool: b.Pool, Clock: b.Clock, Cursors: codec, Customer: c.Service(), Tenant: t.Service(), Mailer: mailer, SecretEncKey: w.SecretEncKey,
+			InsecureHosts: b.Cfg.WebhookInsecureAllowedHosts, RetrySchedule: w.RetrySchedule, GiveUpAfter: w.GiveUpAfter, RetryJitter: w.RetryJitter,
+			BreakerThreshold: w.BreakerThreshold, BreakerOpenFor: w.BreakerOpenFor, Parallelism: w.Parallelism,
+			URLs: integration.URLs{PaymentMethodUpdate: b.Cfg.PaymentMethodUpdateURLTemplate, Mypage: b.Cfg.MypageURL, Console: b.Cfg.ConsoleURL},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("integration: %w", err)
+		}
+	}
+	aud := audit.New(b.Pool, codec)
 	b.Services = Services{Tenant: t.Service(), Customer: c.Service(), Catalog: cat.Service(), Subscription: sub.Service(), Billing: bil.Service(), Payments: pay.Service()}
 	b.devMounts = append(b.devMounts, pay.MountDev)
 	return []ModuleSet{
@@ -93,7 +121,22 @@ func modules(_ context.Context, b *Base, _ string) ([]ModuleSet, error) {
 		{Name: billing.Name, HasOutbox: true, MountHTTP: bil.MountHTTP, Consumers: bil.Consumers(), Jobs: bil.Jobs()},
 		{Name: payments.Name, HasOutbox: true, MountHTTP: pay.MountHTTP, Consumers: pay.Consumers(), Jobs: pay.Jobs()},
 		{Name: orchestration.Name, HasOutbox: true, MountHTTP: orc.MountHTTP, Consumers: orc.Consumers(), Jobs: orc.Jobs()},
+		integrationSet(intg),
+		{Name: audit.Name, MountHTTP: aud.MountHTTP, Ports: func(p *httpx.Ports) { p.AuditWriter = aud }},
 	}, nil
+}
+
+// integrationSet は integration の組み立て（api と worker-integration だけが鍵を持つ。worker-billing はマイグレーションと Relay の対象だけ）。
+func integrationSet(m *integration.Module) ModuleSet {
+	set := ModuleSet{Name: integration.Name, HasOutbox: true}
+	if m == nil {
+		return set
+	}
+	set.MountHTTP, set.Consumers, set.Jobs = m.MountHTTP, m.Consumers(), m.Jobs()
+	for _, l := range m.Loops() {
+		set.Loops = append(set.Loops, Loop{Process: "worker-integration", Run: l})
+	}
+	return set
 }
 
 // tenantPorts は認証・認可のミドルウェアに tenant の contracts を渡す（§4.3）。

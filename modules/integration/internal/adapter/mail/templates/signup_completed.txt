@@ -1,0 +1,15 @@
+{{.tenant_name}} へのお申し込みありがとうございます
+{{.customer_name}} 様
+
+{{.tenant_name}} へのお申し込みが完了しました。
+{{- if eq .status "trialing"}}
+
+無料トライアルは {{date .trial_end}} までです。
+初回のお支払いは {{date .first_charge_date}} です。
+{{- else}}
+
+ご利用期間：{{date .current_period.start}} 〜 {{date .current_period.end}}
+{{- end}}
+
+ご契約の確認・変更はマイページから行えます。
+{{.mypage_url}}

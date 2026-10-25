@@ -1,0 +1,8 @@
+{{.tenant_name}} の無料トライアルがまもなく終了します
+{{.customer_name}} 様
+
+{{.tenant_name}} の無料トライアルは {{date .trial_end}} で終了します。
+{{date .first_charge_date}} に初回のお支払いが行われます。
+
+ご契約の確認・解約はマイページから行えます。
+{{.mypage_url}}

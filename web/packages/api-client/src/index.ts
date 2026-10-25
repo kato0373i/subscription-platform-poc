@@ -15,6 +15,9 @@ export type { paths as ConsoleBillingPaths, components as ConsoleBillingComponen
 export type { paths as OpsBillingPaths, components as OpsBillingComponents } from "./gen/ops-billing.ts";
 export type { paths as MeOrchestrationPaths, components as MeOrchestrationComponents } from "./gen/me-orchestration.ts";
 export type { paths as OpsOrchestrationPaths, components as OpsOrchestrationComponents } from "./gen/ops-orchestration.ts";
+export type { paths as ConsoleIntegrationPaths, components as ConsoleIntegrationComponents } from "./gen/console-integration.ts";
+export type { paths as OpsIntegrationPaths, components as OpsIntegrationComponents } from "./gen/ops-integration.ts";
+export type { paths as OpsAuditPaths, components as OpsAuditComponents } from "./gen/ops-audit.ts";
 export type { ErrorCode } from "./error-codes.ts";
 export { errorStatus } from "./error-codes.ts";
 

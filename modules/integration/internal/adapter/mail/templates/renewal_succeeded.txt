@@ -1,0 +1,9 @@
+{{.tenant_name}} のご契約を更新しました
+{{.customer_name}} 様
+
+{{.tenant_name}} のご契約を更新し、{{yen .amount}} のお支払いが完了しました。
+
+ご利用期間：{{date .current_period.start}} 〜 {{date .current_period.end}}
+{{- if .next_renewal_date}}
+次回の更新日：{{date .next_renewal_date}}
+{{- end}}

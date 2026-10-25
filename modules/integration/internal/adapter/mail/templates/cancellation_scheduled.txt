@@ -1,0 +1,10 @@
+{{if eq .reason "tenant_suspended"}}{{.tenant_name}} のサービス提供終了のお知らせ{{else}}{{.tenant_name}} の解約を受け付けました{{end}}
+{{.customer_name}} 様
+{{if eq .reason "tenant_suspended"}}
+{{.tenant_name}} のサービス提供終了に伴い、ご契約は {{date .effective_date}} で終了します。以後の請求はありません。
+{{- else}}
+解約のお申し込みを受け付けました。{{date .effective_date}} まで引き続きご利用いただけます。
+
+解約の取り消しはマイページから行えます。
+{{.mypage_url}}
+{{- end}}

@@ -1,0 +1,249 @@
+# 事業者コンソールの Webhook の送信先と配信履歴（integration.md §7.1）。主体は staff、ヘッダー X-Tenant-Id 必須。
+# 送信先・鍵の変更は owner だけ（webhook.manage）、再送は owner・admin（webhook.redeliver。identity.md §3.4）。
+openapi: 3.0.3
+info: {title: console-integration, version: "1"}
+paths:
+  /v1/console/webhook-endpoints:
+    post:
+      operationId: consoleCreateWebhookEndpoint
+      x-sp-permission: webhook.manage
+      x-sp-isolation: not_applicable:creates an endpoint in the X-Tenant-Id tenant only
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [url, event_types]
+              properties:
+                url: {type: string}
+                event_types: {type: array, items: {type: string}}
+                description: {type: string}
+                enabled: {type: boolean}
+      responses:
+        "201":
+          description: 作成した送信先と署名鍵（平文はこの応答だけ）
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Endpoint'}
+                  - type: object
+                    required: [secret]
+                    properties:
+                      secret: {type: string}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "403": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+    get:
+      operationId: consoleListWebhookEndpoints
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant's endpoints
+      parameters:
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 送信先の一覧（作成順。削除済みは含めない）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Endpoint'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/webhook-endpoints/{endpoint_id}:
+    get:
+      operationId: consoleGetWebhookEndpoint
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/EndpointIDPath'}
+      responses:
+        "200": {description: 送信先（鍵は含めない）, content: {application/json: {schema: {$ref: '#/components/schemas/Endpoint'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+    patch:
+      operationId: consoleUpdateWebhookEndpoint
+      x-sp-permission: webhook.manage
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/EndpointIDPath'}
+        - {name: If-Match, in: header, description: 楽観ロック（送信先の version）, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                url: {type: string}
+                event_types: {type: array, items: {type: string}}
+                description: {type: string}
+                enabled: {type: boolean}
+      responses:
+        "200": {description: 更新後の送信先, content: {application/json: {schema: {$ref: '#/components/schemas/Endpoint'}}}}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+    delete:
+      operationId: consoleDeleteWebhookEndpoint
+      x-sp-permission: webhook.manage
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/EndpointIDPath'}
+      responses:
+        "204": {description: 削除した（論理削除）}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/webhook-endpoints/{endpoint_id}/rotate-secret:
+    post:
+      operationId: consoleRotateWebhookSecret
+      x-sp-permission: webhook.manage
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/EndpointIDPath'}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                grace_period_hours: {type: integer}
+      responses:
+        "200":
+          description: 新しい署名鍵（平文はこの応答だけ）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [secret, previous_secret_expires_at]
+                properties:
+                  secret: {type: string}
+                  previous_secret_expires_at: {type: string, format: date-time, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/webhook-deliveries:
+    get:
+      operationId: consoleListWebhookDeliveries
+      x-sp-permission: console.read
+      x-sp-isolation: not_applicable:lists only the X-Tenant-Id tenant's deliveries (another tenant's endpoint_id is an empty list via RLS)
+      parameters:
+        - {name: endpoint_id, in: query, schema: {type: string, format: uuid}}
+        - {name: status, in: query, schema: {type: string, enum: [pending, succeeded, failed, abandoned]}}
+        - {name: event_id, in: query, schema: {type: string}}
+        - {name: event_type, in: query, schema: {type: string}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200": {$ref: '#/components/responses/DeliveryList'}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/webhook-deliveries/{delivery_id}:
+    get:
+      operationId: consoleGetWebhookDelivery
+      x-sp-permission: console.read
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/DeliveryIDPath'}
+      responses:
+        "200":
+          description: 配信と試行の履歴、送った JSON
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - {$ref: '#/components/schemas/Delivery'}
+                  - type: object
+                    required: [attempts, payload]
+                    properties:
+                      attempts: {type: array, items: {$ref: '#/components/schemas/Attempt'}}
+                      payload: {type: object, additionalProperties: true}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/console/webhook-deliveries/{delivery_id}/redeliver:
+    post:
+      operationId: consoleRedeliverWebhook
+      x-sp-permission: webhook.redeliver
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/DeliveryIDPath'}
+      responses:
+        "202": {description: 手動再送の新しい配信, content: {application/json: {schema: {$ref: '#/components/schemas/Delivery'}}}}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
+        "409": {$ref: '../common.yaml#/components/responses/Problem'}
+components:
+  parameters:
+    EndpointIDPath: {name: endpoint_id, in: path, required: true, schema: {type: string, format: uuid}}
+    DeliveryIDPath: {name: delivery_id, in: path, required: true, schema: {type: string, format: uuid}}
+  responses:
+    DeliveryList:
+      description: 配信の一覧（新しい順）
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data, has_more, next_cursor]
+            properties:
+              data: {type: array, items: {$ref: '#/components/schemas/Delivery'}}
+              has_more: {type: boolean}
+              next_cursor: {type: string, nullable: true}
+  schemas:
+    Endpoint:
+      type: object
+      required: [id, url, description, event_types, status, api_version, version, secret_rotated_at, previous_secret_expires_at, created_at, updated_at]
+      properties:
+        id: {type: string, format: uuid}
+        url: {type: string}
+        description: {type: string}
+        event_types: {type: array, items: {type: string}}
+        status: {type: string, enum: [enabled, disabled]}
+        api_version: {type: string}
+        version: {type: integer}
+        secret_rotated_at: {type: string, format: date-time, nullable: true}
+        previous_secret_expires_at: {type: string, format: date-time, nullable: true}
+        created_at: {type: string, format: date-time}
+        updated_at: {type: string, format: date-time}
+    Delivery:
+      type: object
+      required: [id, endpoint_id, event, trigger, redelivery_of, status, attempt_count, first_attempted_at, last_attempted_at, next_attempt_at, deadline_at,
+        last_response, created_at]
+      properties:
+        id: {type: string, format: uuid}
+        endpoint_id: {type: string, format: uuid}
+        event:
+          type: object
+          required: [id, type, created_at]
+          properties:
+            id: {type: string}
+            type: {type: string}
+            created_at: {type: string, format: date-time}
+        trigger: {type: string, enum: [auto, manual]}
+        redelivery_of: {type: string, format: uuid, nullable: true}
+        status: {type: string, enum: [pending, succeeded, failed, abandoned]}
+        attempt_count: {type: integer}
+        first_attempted_at: {type: string, format: date-time, nullable: true}
+        last_attempted_at: {type: string, format: date-time, nullable: true}
+        next_attempt_at: {type: string, format: date-time, nullable: true}
+        deadline_at: {type: string, format: date-time, nullable: true}
+        last_response:
+          type: object
+          nullable: true
+          required: [status_code, error_kind]
+          properties:
+            status_code: {type: integer, nullable: true}
+            error_kind: {type: string, nullable: true}
+        created_at: {type: string, format: date-time}
+    Attempt:
+      type: object
+      required: [attempt_no, requested_at, duration_ms, status_code, error_kind, response_excerpt]
+      properties:
+        attempt_no: {type: integer}
+        requested_at: {type: string, format: date-time}
+        duration_ms: {type: integer}
+        status_code: {type: integer, nullable: true}
+        error_kind: {type: string, nullable: true}
+        response_excerpt: {type: string, nullable: true}

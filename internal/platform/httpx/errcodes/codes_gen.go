@@ -109,6 +109,12 @@ const (
 	HasOpenSubscriptions Code = "has_open_subscriptions"
 	// BillingRunInProgress は 同じ課金日の投入が実行中です（409、owner: orchestration）。
 	BillingRunInProgress Code = "billing_run_in_progress"
+	// WebhookEndpointLimitExceeded は Webhook の送信先の上限に達しています（409、owner: integration）。
+	WebhookEndpointLimitExceeded Code = "webhook_endpoint_limit_exceeded"
+	// WebhookDeliveryInProgress は 同じイベントの配信が再試行待ちです（409、owner: integration）。
+	WebhookDeliveryInProgress Code = "webhook_delivery_in_progress"
+	// WebhookEndpointUnavailable は Webhook の送信先が無効または削除されています（409、owner: integration）。
+	WebhookEndpointUnavailable Code = "webhook_endpoint_unavailable"
 )
 
 // Info はコードの HTTP ステータスと題名。
@@ -171,6 +177,9 @@ var All = map[Code]Info{
 	PaymentMethodInUse:           {Status: 409, Title: "この支払方法は契約で使われています", Owner: "orchestration"},
 	HasOpenSubscriptions:         {Status: 409, Title: "有効な契約があるため退会できません", Owner: "orchestration"},
 	BillingRunInProgress:         {Status: 409, Title: "同じ課金日の投入が実行中です", Owner: "orchestration"},
+	WebhookEndpointLimitExceeded: {Status: 409, Title: "Webhook の送信先の上限に達しています", Owner: "integration"},
+	WebhookDeliveryInProgress:    {Status: 409, Title: "同じイベントの配信が再試行待ちです", Owner: "integration"},
+	WebhookEndpointUnavailable:   {Status: 409, Title: "Webhook の送信先が無効または削除されています", Owner: "integration"},
 }
 
 // Status はコードの HTTP ステータス（未登録なら 500）。
