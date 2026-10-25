@@ -141,6 +141,11 @@ type WebhookParser interface {
 	ParseWebhook(ctx context.Context, h http.Header, body []byte) ([]ProviderEvent, error)
 }
 
+// WebhookAcker は受信成功のときに返す本文を決める（任意。fincode は {"receive":"0"} を期待し、それ以外は再送する）。
+type WebhookAcker interface {
+	WebhookAck() []byte
+}
+
 // Settlement は代行側の 1 件の決済（日次照合）。
 type Settlement struct {
 	ProviderOrderRef string

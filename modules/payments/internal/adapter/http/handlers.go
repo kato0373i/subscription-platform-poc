@@ -300,6 +300,12 @@ func (h *handlers) webhook(w nethttp.ResponseWriter, r *nethttp.Request) {
 	case err != nil:
 		httpx.WriteProblem(w, r, err)
 	default:
+		if ack := h.svc.WebhookAck(name); ack != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(nethttp.StatusOK)
+			_, _ = w.Write(ack) //nolint:gosec // 代行が決める固定の本文（要求の内容を含まない）
+			return
+		}
 		w.WriteHeader(nethttp.StatusOK)
 	}
 }

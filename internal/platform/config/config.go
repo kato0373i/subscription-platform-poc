@@ -60,12 +60,14 @@ type Config struct {
 	CatalogCouponReservationTTL time.Duration // 放置されたクーポンの予約を解放するまでの時間（catalog.md §8）
 	BillingCollectionLease      time.Duration // 回収要求のリース（billing.md §8。結果が届かなければ同じ collection_seq で再送する）
 
-	PaymentsMethods   string // 新規登録に使う手段と代行（payments.md §4.4。例 "card:stub"）
-	StubWebhookSecret string // StubAdapter の Webhook の署名鍵（devtools のみ）
-	FincodeAPIBaseURL string
-	FincodeSecretKey  string
-	FincodePublicKey  string
-	ShutdownSec       int
+	PaymentsMethods         string // 新規登録に使う手段と代行（payments.md §4.4。例 "card:stub"）
+	StubWebhookSecret       string // StubAdapter の Webhook の署名鍵（devtools のみ）
+	FincodeAPIBaseURL       string
+	FincodeSecretKey        string
+	FincodePublicKey        string
+	FincodeWebhookSignature string // Webhook 設定の signature（Fincode-Signature ヘッダーの値）
+	FincodeSharedCustomer   bool   // プラットフォームの shared_customer_flag=1（既定 true）
+	ShutdownSec             int
 }
 
 // WebhookConfig は事業者 Webhook の配信の設定（integration.md §8）。
@@ -257,6 +259,11 @@ func LoadFrom(service string, env Getenv, devtools bool) (Config, error) {
 		c.StubWebhookSecret = "local-stub-webhook-secret" //nolint:gosec // devtools ビルドだけの既定値（ローカルの StubAdapter 用）
 	}
 	c.FincodeAPIBaseURL, c.FincodeSecretKey, c.FincodePublicKey = get("FINCODE_API_BASE_URL", ""), get("FINCODE_SECRET_KEY", ""), get("FINCODE_PUBLIC_KEY", "")
+	c.FincodeWebhookSignature = get("FINCODE_WEBHOOK_SIGNATURE", "")
+	c.FincodeSharedCustomer = oneOf("FINCODE_SHARED_CUSTOMER", "true", "true", "false") == "true"
+	if c.FincodeSecretKey != "" && c.FincodeWebhookSignature == "" {
+		errs = append(errs, errors.New("FINCODE_WEBHOOK_SIGNATURE is required when FINCODE_SECRET_KEY is set"))
+	}
 	if d, err := time.ParseDuration(get("CATALOG_COUPON_RESERVATION_TTL", "24h")); err != nil || d <= 0 {
 		errs = append(errs, fmt.Errorf("CATALOG_COUPON_RESERVATION_TTL: invalid %q", get("CATALOG_COUPON_RESERVATION_TTL", "24h")))
 	} else {

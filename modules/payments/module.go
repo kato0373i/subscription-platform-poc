@@ -32,9 +32,11 @@ type Deps struct {
 	// EnableStub は StubAdapter を登録するか（devtools ビルドだけ true。本番では登録しない。P-IMP-15）。
 	EnableStub bool
 	StubSecret string
-	// fincode の設定。SecretKey と APIBaseURL がなければ登録しない（骨格。P-PAY-5）
-	FincodeAPIBaseURL, FincodeSecretKey, FincodePublicKey string
-	Breaker                                               provider.BreakerConfig
+	// fincode の設定。SecretKey と APIBaseURL がなければ登録しない（P-PAY-5・P-IMP-21）
+	FincodeAPIBaseURL, FincodeSecretKey, FincodePublicKey, FincodeWebhookSignature string
+	// FincodeSharedCustomer はプラットフォームの shared_customer_flag=1（顧客・カードをテナント間で共有する）。false の契約には対応しない
+	FincodeSharedCustomer bool
+	Breaker               provider.BreakerConfig
 	// SendProviderEvent は通知の処理の依頼を payments-provider-events キューに送る。
 	SendProviderEvent func(ctx context.Context, body string) error
 }
@@ -73,8 +75,14 @@ func New(d Deps) (*Module, error) {
 		m.stub = stub.New(StubProvider, mdb, d.Clock, d.StubSecret)
 		reg.Register(m.stub)
 	}
-	if fc := (fincode.Config{APIBaseURL: d.FincodeAPIBaseURL, SecretKey: d.FincodeSecretKey, PublicKey: d.FincodePublicKey}); fc.Configured() {
-		reg.Register(fincode.New(fc))
+	fc := fincode.Config{APIBaseURL: d.FincodeAPIBaseURL, SecretKey: d.FincodeSecretKey, PublicKey: d.FincodePublicKey,
+		WebhookSignature: d.FincodeWebhookSignature, SharedCustomer: d.FincodeSharedCustomer}
+	if fc.Configured() {
+		a, err := fincode.New(fc)
+		if err != nil {
+			return nil, err
+		}
+		reg.Register(a)
 		m.publicKeys["fincode"] = fc.PublicKey
 	}
 	m.svc = app.New(app.Deps{DB: mdb, Outbox: outbox.NewWriter(Name, d.Clock, d.Outbox...), Clock: d.Clock, Registry: reg, SendProviderEvent: d.SendProviderEvent})

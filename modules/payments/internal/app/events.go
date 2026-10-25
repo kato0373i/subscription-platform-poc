@@ -24,6 +24,18 @@ import (
 var ErrUnknownProvider = errors.New("payments: unknown webhook provider")
 
 // IngestWebhook は署名を検証して通知を保存し、新しく保存できたものだけ処理の依頼を送る。試行はここでは更新しない。
+// WebhookAck は受信成功のときに返す本文（代行が決める。なければ nil で本文なし）。
+func (s *Service) WebhookAck(providerName string) []byte {
+	p, ok := s.d.Registry.ByProvider(providerName)
+	if !ok {
+		return nil
+	}
+	if a, ok := provider.Capability[provider.WebhookAcker](p); ok {
+		return a.WebhookAck()
+	}
+	return nil
+}
+
 func (s *Service) IngestWebhook(ctx context.Context, providerName string, h http.Header, body []byte) error {
 	p, ok := s.d.Registry.ByProvider(providerName)
 	if !ok {

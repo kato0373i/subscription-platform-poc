@@ -73,6 +73,7 @@ func modules(_ context.Context, b *Base, process string) ([]ModuleSet, error) {
 	pay, err := payments.New(payments.Deps{
 		Pool: b.Pool, Clock: b.Clock, Cursors: codec, Methods: b.Cfg.PaymentsMethods, EnableStub: config.DevtoolsBuild, StubSecret: b.Cfg.StubWebhookSecret,
 		FincodeAPIBaseURL: b.Cfg.FincodeAPIBaseURL, FincodeSecretKey: b.Cfg.FincodeSecretKey, FincodePublicKey: b.Cfg.FincodePublicKey,
+		FincodeWebhookSignature: b.Cfg.FincodeWebhookSignature, FincodeSharedCustomer: b.Cfg.FincodeSharedCustomer,
 		SendProviderEvent: func(ctx context.Context, body string) error {
 			return b.SendToQueue(ctx, "payments-provider-events", body)
 		},
