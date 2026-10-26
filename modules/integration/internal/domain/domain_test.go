@@ -169,7 +169,7 @@ func TestBuildPayloadSubscription(t *testing.T) {
 	env := sk.EventEnvelope{
 		EventID: sk.NewID[sk.EventTag](), EventType: "subscription.renewed", TenantID: &tenant, AggregateType: "subscription",
 		AggregateVersion: 7, OccurredAt: time.Date(2026, 10, 15, 1, 0, 3, 500, time.UTC), CorrelationID: "corr-1",
-		Payload: json.RawMessage(`{"subscription":{"subscription_id":"s1","tenant_id":"t1","customer_account_id":"c1","plan_id":"p1","status":"active",
+		Payload: json.RawMessage(`{"subscription":{"subscription_id":"s1","tenant_id":"t1","customer_account_id":"internal-account-c1","plan_id":"p1","status":"active",
 			"current_period":{"start":"2026-10-15","end":"2026-11-14"},"version":7},"invoice_id":"i1"}`),
 	}
 	body, err := domain.BuildPayload("evt_X", "subscription.renewed", env, "cus_abc")
@@ -177,7 +177,7 @@ func TestBuildPayloadSubscription(t *testing.T) {
 		t.Fatal(err)
 	}
 	s := string(body)
-	for _, bad := range []string{"customer_account_id", "c1", env.EventID.String(), "corr-1", `"t1"`} {
+	for _, bad := range []string{"customer_account_id", "internal-account-c1", env.EventID.String(), "corr-1", `"t1"`} {
 		if strings.Contains(s, bad) {
 			t.Errorf("本文に %s が含まれる: %s", bad, s)
 		}
