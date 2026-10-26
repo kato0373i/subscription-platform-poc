@@ -62,6 +62,11 @@ tasks:
       - for v in $(docker volume ls -q --filter "name=ministack-rds-"); do docker volume rm -f "$v"; done
       - rm -rf infra/envs/local/terraform.tfstate* .env.local .env.container e2e/.env.e2e .local/logs
 
+  demo:seed:
+    desc: デモデータ（約 12 か月分の契約・請求）とコンソールのログイン用アカウントを作る（まっさらな環境で。ログイン情報は .local/demo-accounts.md）
+    dir: e2e
+    cmds: [node --env-file=.env.e2e demo/seed-demo.ts]
+
   verify:local:
     desc: テストイベントを 1 件発行し、購読者まで届くことを確かめる（4 プロセスが起動している前提）
     cmds: [./scripts/verify-local.sh]
