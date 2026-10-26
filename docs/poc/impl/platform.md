@@ -34,7 +34,7 @@
 | 027 | ✅ | `e2e/tests/identity/console-authz.spec.ts`（所属していない 403、停止中の書き込みの `tenant_not_active`） |
 | 029・030・033 | ✅ | `e2e/tests/platform/idempotency.spec.ts`（支払方法の登録で、再送の `Idempotent-Replayed`・違う本文の 422・キーなしの 400） |
 | 031・032 | ✅ | `internal/platform/httpx/integration_test.go` |
-| 034〜036 | ✅ | `httpx_test.go`、`internal/tools/errcodesgen` |
+| 034〜036 | ✅ | `httpx_test.go`、`tools/errcodesgen` |
 | 037・038・062・065 | ✅ | `internal/platform/scheduler/integration_test.go` |
 | 039〜041 | ✅ | `e2e/tests/platform/dev-clock.clock.spec.ts`（ジョブは `platform-noop`） |
 | 042 | ✅ | `cmd/internal/wiring/devtools_off_test.go`、`internal/platform/config/config_test.go` |
@@ -44,12 +44,12 @@
 | 047 | ✅ | `task verify:fallback`（direct）、`DB_MODE=container task up` で E2E を通した |
 | 048・049 | ✅ | `internal/archtest`、golangci-lint（depguard・forbidigo） |
 | 050・071 | ✅（定義） | `.github/workflows/ci.yml`（GitHub ではまだ動かしていない） |
-| 051 | ✅ | `internal/tools/e2elint` |
+| 051 | ✅ | `tools/e2elint` |
 | 052・053 | ✅ | `e2e/tests/audit/audit-records.spec.ts`（価格改定の before/after、viewer の 403 は denied、トークンなしの 401 は残らない） |
 | 054 | 一部 ✅ | `/v1/me` の書き込みは残らないことを `audit-records.spec.ts` で確認。注釈のない console の 2xx（`http.post`）は、注釈のないルートが今はないので `httpx_test.go`（テスト用の `AuditWriter`）だけ |
 | 057 | 一部 | 監査の書き込みに失敗しても応答は 2xx のまま error ログを出すことは `httpx_test.go` で確認。E2E は DB の権限を剥がせない（`sp_e2e_reader` は読み取り専用）ので作らない |
 | 055・056 | ✅ | `internal/platform/auditctx/auditctx_test.go` |
-| 058 | ✅ | `internal/tools/errcodesgen`（共通コード 11 種類＋`clock_backward_not_allowed`・`tenant_not_active`） |
+| 058 | ✅ | `tools/errcodesgen`（共通コード 11 種類＋`clock_backward_not_allowed`・`tenant_not_active`） |
 | 059・060・079 | ✅ | `db_integration_test.go` |
 | 061 | ✅ | `internal/platform/messaging/dispatch_test.go` |
 | 063・064 | ✅ | `messaging/integration_test.go` |

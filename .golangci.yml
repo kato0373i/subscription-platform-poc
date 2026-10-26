@@ -77,12 +77,12 @@ linters:
     generated: lax
     rules:
       # 業務時刻の規約（time.Now の禁止）は modules だけに効かせる
-      - path: '(internal/sharedkernel|internal/platform|internal/tools|cmd|tools)/'
+      - path: '(internal/sharedkernel|internal/platform|cmd|tools)/'
         linters: [forbidigo]
         text: 'time\.Now'
       - path: '_test\.go'
         linters: [forbidigo, gosec, errcheck, noctx, bodyclose, sloglint]
       # CLI とテスト用のツールは標準出力に書く
-      - path: '(cmd/devlogs|cmd/migrate|internal/tools|tools/webhook-sink)/'
+      - path: '(cmd/devlogs|cmd/migrate|tools)/'
         linters: [forbidigo]
         text: 'fmt\.Print|log\.'

@@ -21,7 +21,7 @@ func TestRejectsDuplicateAndCamelCase(t *testing.T) {
 
 // AC-PLT-058
 func TestGeneratesCommonCodes(t *testing.T) {
-	if err := run("../../../api/errors.yaml", t.TempDir()+"/codes_gen.go", t.TempDir()+"/codes.ts"); err != nil {
+	if err := run("../../api/errors.yaml", t.TempDir()+"/codes_gen.go", t.TempDir()+"/codes.ts"); err != nil {
 		t.Fatal(err)
 	}
 	g, ts, err := Generate(file{Codes: []entry{{Code: "provider_unavailable", Status: 503, Title: "x", Owner: "payments"}}})

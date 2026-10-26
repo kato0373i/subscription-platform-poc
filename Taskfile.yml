@@ -89,11 +89,11 @@ tasks:
   generate:
     desc: コード生成（errcodes・sqlc・oapi-codegen・TS の型）。生成物はコミットする
     cmds:
-      - go run ./internal/tools/errcodesgen
+      - go run ./tools/errcodesgen
       - |
         if command -v sqlc >/dev/null 2>&1; then sqlc generate
         else docker run --rm -v "$PWD:/src" -w /src {{.SQLC_IMAGE}} generate; fi
-      - go run ./internal/tools/apigen
+      - go run ./tools/apigen
       - npx -y pnpm@9.15.9 --filter @sp/api-client generate
 
   lint:
@@ -102,7 +102,7 @@ tasks:
       - |
         if command -v golangci-lint >/dev/null 2>&1; then golangci-lint run ./...
         else docker run --rm -v "$PWD:/src" -w /src -v sp-golangci-cache:/root/.cache {{.GOLANGCI_IMAGE}} golangci-lint run ./...; fi
-      - go run ./internal/tools/e2elint
+      - go run ./tools/e2elint
 
   test:unit:
     desc: UT（純粋なロジック）と静的検査（archtest）

@@ -17,7 +17,7 @@
 | API | ops O1〜O6、console C1〜C6 | `GET /v1/me`（JIT は認証のミドルウェアで `ResolveOrCreateAccount`） |
 | 配線 | `cmd/internal/wiring/modules.go`：認証・認可のポート（API キー・スタッフのロール・`Allows`・書き込みの可否）、マイグレーションの順序 | 同：`ResolveConsumer`（JIT のエラーを `account_withdrawn` などの Problem にする） |
 
-コード生成（P-IMP-9）：SQL は sqlc（`modules/<m>/db/queries` → `internal/adapter/postgres/sqlcgen`）、HTTP は oapi-codegen の strict server（`internal/tools/apigen` → `internal/adapter/http/gen/<audience>`）。どちらも `task generate` で作り直し、生成物はコミットする。
+コード生成（P-IMP-9）：SQL は sqlc（`modules/<m>/db/queries` → `internal/adapter/postgres/sqlcgen`）、HTTP は oapi-codegen の strict server（`tools/apigen` → `internal/adapter/http/gen/<audience>`）。どちらも `task generate` で作り直し、生成物はコミットする。
 
 ## 2. 確かめたこと
 

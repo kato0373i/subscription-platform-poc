@@ -21,14 +21,14 @@ jobs:
       - run: npm i -g pnpm@9.15.9 && pnpm install --frozen-lockfile
       - name: 生成の差分チェック（errors.yaml・OpenAPI・messaging.yaml・schedules.yaml の検証を含む）
         run: |
-          go run ./internal/tools/errcodesgen
+          go run ./tools/errcodesgen
           docker run --rm -v "$PWD:/src" -w /src sqlc/sqlc:1.30.0 generate
-          go run ./internal/tools/apigen
+          go run ./tools/apigen
           pnpm --filter @sp/api-client generate
           git diff --exit-code && test -z "$(git status --porcelain)"
       - uses: golangci/golangci-lint-action@v8
         with: {version: v2.14.0}
-      - run: go run ./internal/tools/e2elint
+      - run: go run ./tools/e2elint
       - run: go test ./...
       - run: pnpm -r typecheck
 

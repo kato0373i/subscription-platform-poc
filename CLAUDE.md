@@ -3,6 +3,7 @@
 マルチテナント型サブスクリプション基盤（PoC）。Go のモジュラーモノリス、ECS Fargate、ローカルは MiniStack。
 
 ## 文書の場所
+- ディレクトリの案内：`README.md`（どこに何を置くか・1 つのモジュールの中の形・生成物）
 - 要件：`docs/requirements/subscription-platform.md`
 - 設計：`docs/design/subscription-platform.md`（ADR は §7）
 - PoC の範囲と決定：`docs/poc/00-poc-charter.md`、`docs/poc/02-pdm-decisions.md`

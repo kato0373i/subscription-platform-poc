@@ -28,7 +28,7 @@ func TestRepository(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if errs := Check("../../../e2e/tests", ops); len(errs) > 0 {
+	if errs := Check("../../e2e/tests", ops); len(errs) > 0 {
 		t.Fatal(errs)
 	}
 }
