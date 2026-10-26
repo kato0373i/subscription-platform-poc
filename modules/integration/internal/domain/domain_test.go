@@ -207,7 +207,7 @@ func TestBuildPayloadSubscription(t *testing.T) {
 func TestBuildPayloadInvoice(t *testing.T) {
 	env := sk.EventEnvelope{
 		EventType: "billing.invoice_payment_failed", AggregateType: "invoice", AggregateVersion: 3, OccurredAt: time.Now(),
-		Payload: json.RawMessage(`{"invoice_id":"i1","subscription_id":"s1","amount":980,"attempt_no":2,"next_collection_at":null,"failure_code":"card_declined","customer_account_id":"c1"}`),
+		Payload: json.RawMessage(`{"invoice_id":"i1","subscription_id":"s1","amount":980,"attempt_no":2,"next_collection_at":null,"failure_code":"card_declined","customer_account_id":"internal-account-c1"}`),
 	}
 	body, err := domain.BuildPayload("evt_Y", "invoice.payment_failed", env, "")
 	if err != nil {
@@ -221,7 +221,7 @@ func TestBuildPayloadInvoice(t *testing.T) {
 	if o["object"] != "invoice" || o["id"] != "i1" || o["amount"] != float64(980) || o["attempt_no"] != float64(2) || o["failure_code"] != "card_declined" {
 		t.Fatalf("payload = %s", body)
 	}
-	if _, ok := o["customer_id"]; ok || strings.Contains(string(body), "c1") {
+	if _, ok := o["customer_id"]; ok || strings.Contains(string(body), "internal-account-c1") {
 		t.Fatalf("invoice に customer が入っている: %s", body)
 	}
 }
