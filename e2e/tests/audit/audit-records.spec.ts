@@ -99,3 +99,50 @@ test("ops の閲覧：action・期間で絞り込み、カーソルで次のペ�
   const future = await records(api, op, { tenant_id: tenant.id, occurred_from: "2999-01-01T00:00:00Z" });
   expect(future.data).toEqual([]);
 });
+
+test("AC-PLT-053・054（一部）: トークンなしの書き込み（401）と契約者の /v1/me の書き込みは監査に残らない。同じ時期の staff の書き込みは残る", async ({ api, world, db, wait }) => {
+  const tenant = await world.createTenant();
+  const consumer = await world.createConsumer();
+  // 要求ごとに別の相関 ID を付け、監査の行をその相関 ID で数える
+  const corr = (tag: string) => ({ "X-Correlation-Id": `e2e-audit-${tag}-${crypto.randomUUID().slice(0, 8)}` });
+  const anon = corr("anon");
+  const noToken = await api.call("POST", "/v1/console/webhook-endpoints", { tenantId: tenant.id, headers: anon, body: { url: "https://example.com/a", event_types: ["invoice.paid"] } });
+  expect(noToken.status).toBe(401);
+  const me = corr("me");
+  const pm = await api.call("POST", "/v1/me/payment-methods", {
+    token: consumer.token, idempotencyKey: crypto.randomUUID(), headers: me,
+    body: { method_type: "card", provider: "stub", token: `tok_stub_ok_4242_1228_${crypto.randomUUID().replaceAll("-", "").slice(0, 8)}` },
+  });
+  expect(pm.status).toBe(201);
+  // 監査の行が書かれ終わったことを、比較用の staff の書き込みの行で確かめてから数える
+  const staff = corr("staff");
+  const ok = await api.call("POST", "/v1/console/webhook-endpoints", { token: tenant.ownerToken, tenantId: tenant.id, idempotencyKey: crypto.randomUUID(), headers: staff, body: { url: "https://example.com/s", event_types: ["invoice.paid"] } });
+  expect(ok.status, JSON.stringify(ok.body)).toBe(201);
+  await wait.until(async () => (await db.count("SELECT count(*) FROM audit.audit_records WHERE correlation_id = $1", [staff["X-Correlation-Id"]])) === 1, { message: "staff の書き込みの監査" });
+  expect(await db.count("SELECT count(*) FROM audit.audit_records WHERE correlation_id = $1", [anon["X-Correlation-Id"]])).toBe(0);
+  expect(await db.count("SELECT count(*) FROM audit.audit_records WHERE correlation_id = $1", [me["X-Correlation-Id"]])).toBe(0);
+});
+
+test("AC-IDN-001・035・036（監査）: tenant.create・staff.update_role・api_key.create が、個人情報・鍵の平文を含まずに残る", async ({ api, world, db, wait }) => {
+  const tenant = await world.createTenant(); // 運営者が登録 → 承認（tenant.create）
+  const admin = await world.createStaff(tenant, "admin");
+  const staff = await api.call<{ data: { id: string; subject: string; email: string }[] }>("GET", "/v1/console/staff", { token: tenant.ownerToken, tenantId: tenant.id });
+  const target = staff.body.data.find((s) => s.subject === admin.sub)!;
+  expect((await api.call("PATCH", `/v1/console/staff/${target.id}`, { token: tenant.ownerToken, tenantId: tenant.id, body: { role: "viewer" } })).status).toBe(200);
+  const key = await api.call<{ id: string; api_key: string }>("POST", "/v1/console/api-keys", { token: tenant.ownerToken, tenantId: tenant.id, body: { name: "監査の確認" } });
+  expect(key.status).toBe(201);
+
+  type Rec = { action: string; actor_type: string; before: Record<string, unknown> | null; after: Record<string, unknown> | null };
+  const rec = (action: string, targetId: string) =>
+    wait.until(async () => (await db.query<Rec>("SELECT action, actor_type, before, after FROM audit.audit_records WHERE action = $1 AND target_id = $2", [action, targetId]))[0], { message: action });
+  const created = await rec("tenant.create", tenant.id);
+  expect(created).toMatchObject({ actor_type: "operator", after: { tenant_name: tenant.name } });
+  const role = await rec("staff.update_role", target.id);
+  expect(role).toMatchObject({ actor_type: "staff", before: { role: "admin" }, after: { role: "viewer" } });
+  expect(JSON.stringify(role)).not.toContain(target.email);
+  expect(JSON.stringify(role)).not.toContain(target.subject);
+  const issued = await rec("api_key.create", key.body.id);
+  expect(issued.after).toMatchObject({ key_name: "監査の確認" });
+  expect(issued.after).toHaveProperty("key_prefix");
+  expect(JSON.stringify(issued)).not.toContain(key.body.api_key);
+});

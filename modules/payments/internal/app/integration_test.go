@@ -378,6 +378,10 @@ func TestSharedBreaker(t *testing.T) {
 	if f.count(t, `SELECT count(*) FROM payments.payment_attempts`) != 0 {
 		t.Error("試行を作った")
 	}
+	// 支払方法の登録も送らず、503 provider_unavailable になる（§7.2）
+	if _, err := f.svc.RegisterPaymentMethod(context.Background(), c.RegisterPaymentMethodCmd{CustomerAccountID: customer, MethodType: c.MethodCard, Provider: "stub", Token: token("ok")}); !errors.Is(err, c.ErrProviderUnavailable) {
+		t.Errorf("ブレーカーが開いているときの登録: %v", err)
+	}
 	f.clock.Advance(31 * time.Second)
 	if r, err := worker.Collect(context.Background(), f.cmd(tenant, customer, pm, inv, 1)); err != nil || r.Status != c.AttemptSucceeded {
 		t.Errorf("閉じた後: %+v %v", r, err)

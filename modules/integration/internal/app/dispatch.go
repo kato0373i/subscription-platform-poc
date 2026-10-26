@@ -153,7 +153,12 @@ func (s *Service) deliverNext(ctx context.Context, endpointID uuid.UUID) (bool, 
 		return false, err
 	}
 
-	// 4：署名して送る（トランザクションの外。試行ごとに署名し直す）
+	// 4：署名して送る（トランザクションの外。試行ごとに署名し直す）。ログは元のイベントの相関 ID で追えるようにする（AC-PLT-073）
+	if ev.CorrelationID != nil {
+		cause := ev.SourceEventID.String()
+		ctx = observability.WithCorrelation(ctx, *ev.CorrelationID, &cause)
+	}
+	ctx = observability.WithFields(ctx, slog.String("delivery_id", d.ID.String()), slog.String("event_id", ev.ID))
 	sentAt := s.d.Clock.Now()
 	res, err := s.d.Sender.Send(ctx, webhook.Request{
 		URL: ep.URL, Body: []byte(ev.Payload), Secrets: ep.ActiveSecrets(sentAt), EventID: ev.ID, EventType: ev.EventType, DeliveryID: d.ID.String(),

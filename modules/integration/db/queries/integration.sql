@@ -66,8 +66,8 @@ UPDATE integration.webhook_endpoints SET secret_previous_ciphertext = NULL, prev
 -- ---- 外部イベント ----
 
 -- name: InsertWebhookEvent :execrows
-INSERT INTO integration.webhook_events (id, tenant_id, source_event_id, event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at, payload, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO integration.webhook_events (id, tenant_id, source_event_id, event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at, payload, created_at, correlation_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (source_event_id) DO NOTHING;
 
 -- name: GetWebhookEvent :one

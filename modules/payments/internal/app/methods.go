@@ -64,6 +64,9 @@ func (s *Service) RegisterPaymentMethod(ctx context.Context, cmd c.RegisterPayme
 		return c.PaymentMethodView{}, err
 	}
 	if err := s.guard(ctx, p); err != nil {
+		if errors.Is(err, provider.ErrUnavailable) {
+			return c.PaymentMethodView{}, c.ErrProviderUnavailable // 503 provider_unavailable（§7.2）
+		}
 		return c.PaymentMethodView{}, err
 	}
 	rm, err := reg.RegisterMethod(ctx, provider.RegisterInput{CustomerAccountID: cmd.CustomerAccountID, Token: cmd.Token, IdempotencyKey: cmd.IdempotencyKey})

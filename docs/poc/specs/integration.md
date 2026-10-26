@@ -686,6 +686,7 @@ integration から見た要件。項目名とポートは TL-Platform の platfo
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
 | 2026-10-26 | §3.6.1 に `staff.invite`・`staff.resend_invitation` を追加（business-console、P-IMP-22） | PdM |
 | 2026-10-26 | §3.6.1 に `mrr_goal.update`・`mrr_goal.delete` を追加（console-dashboard、P-IMP-23） | PdM |
+| 2026-10-27 | `webhook_events` に `correlation_id` を追加し、配信の送信（`http.outbound.completed`）のログに元のイベントの相関 ID と `delivery_id` を付ける（AC-PLT-073 の確認で見つかった漏れ。マイグレーション 00003） | TL-Integration（Claude） |
 
 ## 付録 A. DDL
 
@@ -731,7 +732,8 @@ CREATE TABLE integration.webhook_events (
   aggregate_version  int  NOT NULL,
   occurred_at        timestamptz NOT NULL,
   payload            text NOT NULL CHECK (octet_length(payload) <= 65536),
-  created_at         timestamptz NOT NULL
+  created_at         timestamptz NOT NULL,
+  correlation_id     text NULL CHECK (char_length(correlation_id) <= 128)  -- 元のイベントの相関 ID（配信のログに引き継ぐ。platform.md §8.6）
 );
 CREATE INDEX ON integration.webhook_events (tenant_id, created_at DESC);
 

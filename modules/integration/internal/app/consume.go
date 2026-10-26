@@ -81,6 +81,7 @@ func (s *Service) handleWebhook(ctx context.Context, tx db.Tx, env sk.EventEnvel
 	n, err := r.Q.InsertWebhookEvent(ctx, sqlcgen.InsertWebhookEventParams{
 		ID: evtID, TenantID: env.TenantID.UUID(), SourceEventID: env.EventID.UUID(), EventType: ext, AggregateType: env.AggregateType,
 		AggregateID: env.AggregateID, AggregateVersion: int32(env.AggregateVersion), OccurredAt: env.OccurredAt, Payload: string(body), CreatedAt: now,
+		CorrelationID: &env.CorrelationID,
 	})
 	if err != nil {
 		return err

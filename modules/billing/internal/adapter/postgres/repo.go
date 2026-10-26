@@ -13,6 +13,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"subscription-platform/internal/platform/db"
+	"subscription-platform/internal/platform/observability"
 	sk "subscription-platform/internal/sharedkernel"
 	c "subscription-platform/modules/billing/contracts"
 	"subscription-platform/modules/billing/internal/adapter/postgres/sqlcgen"
@@ -318,6 +319,13 @@ func (r *Repo) Update(ctx context.Context, x *domain.Invoice, now time.Time) err
 	}
 	if n == 0 {
 		return ErrVersionConflict
+	}
+	if from := x.SavedStatus(); from != s.Status {
+		reason := ""
+		if s.VoidReason != nil {
+			reason = string(*s.VoidReason)
+		}
+		observability.StateChanged(ctx, "invoice", s.ID.String(), string(from), string(s.Status), reason)
 	}
 	return nil
 }

@@ -35,7 +35,7 @@
 
 | AC | 状況 | 確かめている場所 |
 |---|---|---|
-| 001 | ✅（監査記録は ⏳ audit） | `ops-tenants.spec.ts`。`tenant.create` の注釈は書いている |
+| 001 | ✅ | `ops-tenants.spec.ts`。監査記録 `tenant.create` は `audit/audit-records.spec.ts` |
 | 002〜004・006 | ✅ | `ops-tenants.spec.ts`、`modules/tenant/internal/app/integration_test.go` |
 | 005・008・037 | ✅ | `modules/tenant/internal/domain/domain_test.go`、`modules/tenant/contracts/contracts_test.go` |
 | 007・012・014・017・018・034 | ✅ | `modules/tenant/internal/app/integration_test.go` |
@@ -47,7 +47,7 @@
 | 022・026〜028・030〜032 | ✅ | `modules/customer/internal/app/integration_test.go`（031 は退会の API が orchestration なので、結合テストで確かめている） |
 | 029 | 一部 ✅ | `Withdraw` のマスキング・`customer.withdrawn`（tenant_id = null）・リンクが残ることは結合テスト。`DELETE /v1/me` の E2E（`me-withdraw.spec.ts`）は orchestration の実装後 |
 | 033 | ✅ | E2E-018 |
-| 035・036 | ✅（監査記録は ⏳ audit） | `console-staff.spec.ts`・`console-api-keys.spec.ts`。`staff.update_role`・`api_key.create` の注釈は書いている（キー名は P-IMP-8） |
+| 035・036 | ✅ | `console-staff.spec.ts`・`console-api-keys.spec.ts`。監査記録（`staff.update_role` の前後に email・subject を含まない、`api_key.create` に平文を含まない）は `audit/audit-records.spec.ts` |
 
 Platform の AC で identity を待っていたもの（`docs/poc/impl/platform.md` も更新済み）：AC-PLT-027 は ✅。AC-PLT-025 は tenant_api の入口（`/v1/tenant/*`）が subscription の実装後、AC-PLT-067 は契約一覧が subscription の実装後。
 

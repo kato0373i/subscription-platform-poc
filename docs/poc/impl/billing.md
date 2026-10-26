@@ -39,8 +39,12 @@
 | 006・008・009・012・026・030 | ✅ | `modules/billing/internal/app/integration_test.go` |
 | 031 | ✅ | `e2e/tests/billing/invoices.spec.ts`（E2E-016 での確認は orchestration の実装時） |
 | 032・033（HTTP の 400）・034 | ✅ | `e2e/tests/billing/dunning-policy.spec.ts` |
-| 038 | 一部 ✅ | サービス層（seq+1・リース中は同じ seq）は結合テスト、HTTP の 409・404 は `ops-collect.spec.ts`。scheduled の請求への 202 の E2E は未作成（更新課金で作れるようになった） |
+| 038 | ✅ | サービス層は結合テスト、HTTP の 409・404 は `ops-collect.spec.ts`、更新課金で支払いに失敗した scheduled の請求への 202（collection_seq+1・reason=ops、同時の 2 回目も同じ seq）は `ops-collect.clock.spec.ts` |
 | 020・022・028・035〜037・039 | ✅ | E2E-009・011・010・007・008・021・022（`e2e/tests/scenarios/`） |
+
+## 3a. 後から直したこと
+
+- 2026-10-27：請求の状態の変化の `domain.state_changed`（platform.md §8.6・P-OBS-5）を出していなかったので、リポジトリの更新で出すようにした（`aggregate=invoice`、理由は void の理由。AC-PLT-078）。
 
 ## 4. 他の TL への引き継ぎ
 

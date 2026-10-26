@@ -50,7 +50,12 @@ test("AC-PAY-023: 代行も照会できない結果不明の試行を failed で
   expect(events).toHaveLength(1);
   expect(events[0]!.payload).toMatchObject({ resolution: "manual", resolved_by: opToken.sub });
   expect(events[0]!.actor.type).toBe("operator");
-  // 監査記録（payment_attempt.resolve）の DB 確認は audit モジュールの実装後
+  // 監査記録（payment_attempt.resolve）：運営者・変更前後の状態・メモ
+  const [audit] = await db.query<{ actor_type: string; actor_id: string; before: { status: string }; after: { status: string; note: string } }>(
+    "SELECT actor_type, actor_id, before, after FROM audit.audit_records WHERE action = 'payment_attempt.resolve' AND target_id = $1",
+    [row!.id],
+  );
+  expect(audit).toMatchObject({ actor_type: "operator", actor_id: opToken.sub, before: { status: "unknown" }, after: { status: "failed" } });
   const noCode = await api.call("POST", `/v1/ops/payment-attempts/${row!.id}/resolve`, { token: opToken.token, body: { outcome: "failed", note: "x" } });
   expect(noCode.status).toBe(400); // failed には failure_code と retryable が要る
   const flip = await api.call("POST", `/v1/ops/payment-attempts/${row!.id}/resolve`, { token: opToken.token, body: { outcome: "succeeded", note: "x" } });

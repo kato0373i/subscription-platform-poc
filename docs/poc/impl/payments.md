@@ -39,12 +39,16 @@
 | 003 | 一部 ✅ | 一覧は `payment-methods.spec.ts`、決済での他人の支払方法は結合テスト（E-08）。申込での 404 は orchestration の実装後 |
 | 010・030・031・034 | ✅ | `stub_test.go`・`registry_test.go`・`domain_test.go` |
 | 011〜014・018・020・021・025・027・029・035〜038 | ✅ | `modules/payments/internal/app/integration_test.go` |
-| 023・024 | ✅（監査記録は ⏳ audit） | `ops-resolve.spec.ts` |
+| 023・024 | ✅ | `ops-resolve.spec.ts`（監査記録 `payment_attempt.resolve` も） |
 | 032 | ✅ | `webhook-stub.spec.ts` |
 | 019 | 一部 ✅ | 非同期の確定が Webhook の経路で反映されることは `stub-settle.spec.ts`。更新課金を通す確認は billing・orchestration の実装後 |
 | 004・008・009・015・016・026・028・033 | ✅ | E2E-016・001、`orchestration/checkout-declined.spec.ts`、E2E-011、`orchestration/checkout-unknown-fail.spec.ts`・`withdraw.spec.ts`、E2E-007・009 |
 | 007 | ✅ | `e2e/tests/payments/checkout-pan.spec.ts`（§11.3 の手順 1〜11 を 3 枚のカードで。申込ページは `web/checkout`） |
-| 017・022 | 一部 ✅ | 照合の振る舞いは結合テスト。E2E（clock）は未作成 |
+| 017・022 | ✅ | `unknown-resolution.clock.spec.ts`（017。016 も同じファイルで時刻を進めて確認）、`reconciliation.clock.spec.ts`（022。resolve_unknown は実時間の毎分 0 秒に動くので、境目を避けて日付を進める） |
+
+## 3a. 後から直したこと
+
+- 2026-10-27：ブレーカーが開いているときの支払方法の登録が 500 になっていたのを、仕様どおり 503 `provider_unavailable` に直した（登録の前のブレーカーの確認の誤りを変換していなかった。`TestSharedBreaker` に追加）。ブレーカーは決済代行ごと・全プロセスで共有で、結果不明・接続エラーが連続 5 回で 30 秒開く（E2E で結果不明を作るときは 1 テスト 1 件にする）。
 
 ## 4. 他の TL への引き継ぎ
 

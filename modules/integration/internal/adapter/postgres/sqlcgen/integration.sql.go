@@ -311,7 +311,7 @@ func (q *Queries) GetInvoiceSummary(ctx context.Context, invoiceID uuid.UUID) (I
 }
 
 const getWebhookEvent = `-- name: GetWebhookEvent :one
-SELECT id, tenant_id, source_event_id, event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at, payload, created_at FROM integration.webhook_events WHERE id = $1
+SELECT id, tenant_id, source_event_id, event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at, payload, created_at, correlation_id FROM integration.webhook_events WHERE id = $1
 `
 
 func (q *Queries) GetWebhookEvent(ctx context.Context, id string) (IntegrationWebhookEvent, error) {
@@ -328,6 +328,7 @@ func (q *Queries) GetWebhookEvent(ctx context.Context, id string) (IntegrationWe
 		&i.OccurredAt,
 		&i.Payload,
 		&i.CreatedAt,
+		&i.CorrelationID,
 	)
 	return i, err
 }
@@ -488,8 +489,8 @@ func (q *Queries) InsertEndpoint(ctx context.Context, arg InsertEndpointParams) 
 
 const insertWebhookEvent = `-- name: InsertWebhookEvent :execrows
 
-INSERT INTO integration.webhook_events (id, tenant_id, source_event_id, event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at, payload, created_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+INSERT INTO integration.webhook_events (id, tenant_id, source_event_id, event_type, aggregate_type, aggregate_id, aggregate_version, occurred_at, payload, created_at, correlation_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 ON CONFLICT (source_event_id) DO NOTHING
 `
 
@@ -504,6 +505,7 @@ type InsertWebhookEventParams struct {
 	OccurredAt       time.Time
 	Payload          string
 	CreatedAt        time.Time
+	CorrelationID    *string
 }
 
 // ---- 外部イベント ----
@@ -519,6 +521,7 @@ func (q *Queries) InsertWebhookEvent(ctx context.Context, arg InsertWebhookEvent
 		arg.OccurredAt,
 		arg.Payload,
 		arg.CreatedAt,
+		arg.CorrelationID,
 	)
 	if err != nil {
 		return 0, err

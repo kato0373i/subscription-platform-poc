@@ -95,9 +95,13 @@ type Event struct {
 type Invoice struct {
 	s      State
 	events []Event
+	saved  c.InvoiceStatus // 最後に保存・読み込みした状態（domain.state_changed のログの from。新規は ""）
 }
 
-func Restore(s State) *Invoice { return &Invoice{s: s} }
+func Restore(s State) *Invoice { return &Invoice{s: s, saved: s.Status} }
+
+// SavedStatus は最後に保存・読み込みした状態（MarkSaved で今の状態になる）。
+func (x *Invoice) SavedStatus() c.InvoiceStatus { return x.saved }
 
 func (x *Invoice) State() State { return x.s }
 
@@ -447,8 +451,11 @@ func (x *Invoice) View() c.InvoiceView {
 	}
 }
 
-// MarkSaved は保存したことを反映する（version を進める）。
-func (x *Invoice) MarkSaved() { x.s.Version++ }
+// MarkSaved は保存したことを反映する（version を進め、保存した状態を覚える）。
+func (x *Invoice) MarkSaved() {
+	x.s.Version++
+	x.saved = x.s.Status
+}
 
 // ---- DunningPolicy（§3.6） ----
 

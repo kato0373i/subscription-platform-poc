@@ -111,4 +111,5 @@ type IntegrationWebhookEvent struct {
 	OccurredAt       time.Time
 	Payload          string
 	CreatedAt        time.Time
+	CorrelationID    *string
 }

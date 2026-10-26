@@ -9,7 +9,7 @@ type Page = { data: Attempt[]; has_more: boolean; next_cursor: string | null };
 test("operator-console FR-006: 結果不明の試行は一覧に出て、手動で確定すると消える。経過時間・状態で絞り込める", async ({ api, world, tokens, db, wait }) => {
   const tenant = await world.createTenant();
   const plan = await createPlan(api, tenant, { amount: 980 });
-  // 結果不明が出ると事業者の回路が開くので、1 事業者に 1 件だけ作る
+  // 結果不明はブレーカー（決済代行ごと・全プロセスで共有、連続 5 回で開く）の失敗に数えるので、1 件だけ作る
   expect((await world.seedSubscriptions(tenant, plan.id, 1, "timeout_lost")).failed).toBe(1);
   const [row] = await wait.until(
     async () => {

@@ -1,5 +1,5 @@
 // billing.md §7.3（POST /v1/ops/invoices/{id}/collect）：409 の 2 種と 404。
-// AC-BIL-038 の 202（scheduled の請求の collection_seq+1）は、scheduled の請求を作る更新課金（orchestration）の実装後に追加する（サービス層は integration で確認済み）。
+// AC-BIL-038 の 202（scheduled の請求の collection_seq+1）は ops-collect.clock.spec.ts。
 import { test, expect } from "../../fixtures/index.ts";
 import { createPlan } from "../../helpers/catalog.ts";
 
