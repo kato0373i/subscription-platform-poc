@@ -9,6 +9,7 @@ import (
 	"io"
 	"log/slog"
 	nethttp "net/http"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -204,6 +205,59 @@ func attemptJSON(st domain.AttemptState) map[string]any {
 		"failure_code": st.FailureCode, "retryable": st.Retryable, "provider_raw_code": st.ProviderRawCode, "resolution": st.Resolution,
 		"resolved_by": st.ResolvedBy, "resolve_note": st.ResolveNote, "check_count": st.CheckCount, "requested_at": st.RequestedAt, "finalized_at": st.FinalizedAt,
 	}
+}
+
+func (h opsHandlers) OpsListUnresolvedPaymentAttempts(ctx context.Context, req ops.OpsListUnresolvedPaymentAttemptsRequestObject) (ops.OpsListUnresolvedPaymentAttemptsResponseObject, error) {
+	var statuses []string
+	if req.Params.Status != nil {
+		for _, st := range *req.Params.Status {
+			statuses = append(statuses, string(st))
+		}
+	}
+	older := 30 * time.Second
+	if v := req.Params.OlderThanSeconds; v != nil {
+		older = time.Duration(*v) * time.Second
+	}
+	var after *postgres.AttemptCursor
+	if s := req.Params.StartingAfter; s != nil && *s != "" {
+		var cur postgres.AttemptCursor
+		if err := h.codec.Decode(*s, &cur); err != nil {
+			return nil, httpx.Error(errcodes.ValidationFailed, "starting_after is invalid", httpx.FieldError{Field: "starting_after", Code: "invalid"})
+		}
+		after = &cur
+	}
+	limit := 20
+	if req.Params.Limit != nil {
+		limit = *req.Params.Limit
+	}
+	rows, more, err := h.svc.UnresolvedAttempts(ctx, statuses, older, after, limit)
+	if err != nil {
+		return nil, problem(err)
+	}
+	data := make([]map[string]any, len(rows))
+	for i, st := range rows {
+		data[i] = attemptJSON(st)
+	}
+	var next *string
+	if more {
+		last := rows[len(rows)-1]
+		s := h.codec.Encode(postgres.AttemptCursor{RequestedAt: last.RequestedAt, ID: last.ID.UUID()})
+		next = &s
+	}
+	return convert[ops.OpsListUnresolvedPaymentAttempts200JSONResponse](map[string]any{"data": data, "has_more": more, "next_cursor": next})
+}
+
+func (h opsHandlers) OpsAcknowledgeReconciliationReport(ctx context.Context, req ops.OpsAcknowledgeReconciliationReportRequestObject) (ops.OpsAcknowledgeReconciliationReportResponseObject, error) {
+	row, err := h.svc.AcknowledgeDiscrepancy(ctx, req.ReportId, req.Body.Note)
+	switch {
+	case errors.Is(err, app.ErrInvalidNote):
+		return nil, httpx.Error(errcodes.ValidationFailed, err.Error(), httpx.FieldError{Field: "note", Code: "invalid"})
+	case errors.Is(err, app.ErrDiscrepancyNotFound):
+		return nil, httpx.Error(errcodes.NotFound, "")
+	case err != nil:
+		return nil, problem(err)
+	}
+	return ops.OpsAcknowledgeReconciliationReport200JSONResponse{Id: row.ID, Status: ops.OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus(row.Status)}, nil
 }
 
 func attemptID(u uuid.UUID) sk.PaymentAttemptID { return sk.IDFromUUID[sk.PaymentAttemptTag](u) }

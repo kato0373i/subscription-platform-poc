@@ -397,6 +397,12 @@ Orchestration が `IsPaymentMethodInUse` を確認し、使われていなけれ
 ### 7.7 `GET /v1/ops/reconciliation-reports`（operator）
 `business_date`、`status`、カーソル。`reconciliation_discrepancies` の一覧。
 
+### 7.7a 運営者コンソールのための ops（operator。`docs/design/operator-console.md` §5.1）
+| API | 内容 |
+|---|---|
+| `GET /v1/ops/payment-attempts?status=&older_than_seconds=&limit=&starting_after=` | 確定していない試行（`unknown`・`processing`・`pending_async`。省略で 3 つ）を依頼の古い順に。`older_than_seconds` の既定は 30。カーソルは (requested_at, id) |
+| `POST /v1/ops/reconciliation-reports/{id}/acknowledge` | `{note}`（1〜1,000 文字）。`open → acknowledged`、対応済みなら 200 で何もしない。404 `not_found`。監査 `reconciliation.acknowledge`（after に note） |
+
 ### 7.8 dev 専用（ビルドタグ `dev`、本番ビルドに含めない）
 | エンドポイント | 内容 |
 |---|---|
@@ -866,3 +872,4 @@ CREATE TABLE stub_charges (order_ref text PRIMARY KEY, idempotency_key text NOT 
 -- 共通: outbox_events, processed_messages（Platform の定義どおり）
 ```
 | 2026-10-25 | 実装時の決定を反映（P-IMP-15）：StubAdapter は登録だけを devtools に限る、Stub の表は devtools の migrate だけ（バージョン表を分ける）、ジョブ名を `payments-<name>` に、通知の処理の依頼は EventEnvelope で SQS に直接送る、dev の settle は `IngestWebhook` に直接渡す、`reconciliation_discrepancies` にも tenant の RLS。実装の状況は `docs/poc/impl/payments.md` | PdM |
+| 2026-10-26 | 運営者コンソールのための ops の API を 2 つ追加（§7.7a：確定していない試行の一覧、照合の不整合の対応済み。operator-console 設計 §5.1・ADR-O02） | PdM |

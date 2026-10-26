@@ -75,10 +75,11 @@ resource "aws_ses_email_identity" "noreply" {
   email = "noreply@sp.local"
 }
 
-# AUTH_MODE=cognito 用の運営者のプール（PoC の標準は AUTH_MODE=dev）
-resource "aws_cognito_user_pool" "pool" {
-  for_each = toset(["operator"])
-  name     = "sp-local-${each.key}"
+# 運営者のプール（運営者コンソール。本番と同じ定義のモジュール。operator-console §5.3）
+module "operator_auth" {
+  source      = "../../modules/operator_auth"
+  name        = "sp-local-operator"
+  console_url = "http://localhost:8090/ops/login"
 }
 
 # 契約者のプール（マイページ。本番と同じ定義のモジュール。consumer-mypage §5.4）
@@ -94,11 +95,6 @@ module "staff_auth" {
   console_url = "http://localhost:8090/console/login"
 }
 
-resource "aws_cognito_user_pool_client" "client" {
-  for_each     = aws_cognito_user_pool.pool
-  name         = "sp-local-${each.key}"
-  user_pool_id = each.value.id
-}
 
 output "db_address" {
   value = module.data.address
@@ -114,7 +110,7 @@ output "queue_urls" {
 
 output "cognito" {
   value = merge(
-    { for k, p in aws_cognito_user_pool.pool : k => { id = p.id, client_id = aws_cognito_user_pool_client.client[k].id } },
+    { operator = { id = module.operator_auth.user_pool_id, client_id = module.operator_auth.client_id } },
     { staff = { id = module.staff_auth.user_pool_id, client_id = module.staff_auth.client_id } },
     { consumer = { id = module.consumer_auth.user_pool_id, client_id = module.consumer_auth.client_id } },
   )

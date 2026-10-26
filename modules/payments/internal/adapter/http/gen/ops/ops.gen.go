@@ -45,6 +45,27 @@ func (e AttemptStatus) Valid() bool {
 	}
 }
 
+// Defines values for OpsListUnresolvedPaymentAttemptsParamsStatus.
+const (
+	OpsListUnresolvedPaymentAttemptsParamsStatusPendingAsync OpsListUnresolvedPaymentAttemptsParamsStatus = "pending_async"
+	OpsListUnresolvedPaymentAttemptsParamsStatusProcessing   OpsListUnresolvedPaymentAttemptsParamsStatus = "processing"
+	OpsListUnresolvedPaymentAttemptsParamsStatusUnknown      OpsListUnresolvedPaymentAttemptsParamsStatus = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the OpsListUnresolvedPaymentAttemptsParamsStatus enum.
+func (e OpsListUnresolvedPaymentAttemptsParamsStatus) Valid() bool {
+	switch e {
+	case OpsListUnresolvedPaymentAttemptsParamsStatusPendingAsync:
+		return true
+	case OpsListUnresolvedPaymentAttemptsParamsStatusProcessing:
+		return true
+	case OpsListUnresolvedPaymentAttemptsParamsStatusUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for OpsResolvePaymentAttemptJSONBodyOutcome.
 const (
 	OpsResolvePaymentAttemptJSONBodyOutcomeFailed    OpsResolvePaymentAttemptJSONBodyOutcome = "failed"
@@ -65,16 +86,34 @@ func (e OpsResolvePaymentAttemptJSONBodyOutcome) Valid() bool {
 
 // Defines values for OpsListReconciliationReportsParamsStatus.
 const (
-	Acknowledged OpsListReconciliationReportsParamsStatus = "acknowledged"
-	Open         OpsListReconciliationReportsParamsStatus = "open"
+	OpsListReconciliationReportsParamsStatusAcknowledged OpsListReconciliationReportsParamsStatus = "acknowledged"
+	OpsListReconciliationReportsParamsStatusOpen         OpsListReconciliationReportsParamsStatus = "open"
 )
 
 // Valid indicates whether the value is a known member of the OpsListReconciliationReportsParamsStatus enum.
 func (e OpsListReconciliationReportsParamsStatus) Valid() bool {
 	switch e {
-	case Acknowledged:
+	case OpsListReconciliationReportsParamsStatusAcknowledged:
 		return true
-	case Open:
+	case OpsListReconciliationReportsParamsStatusOpen:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus.
+const (
+	OpsAcknowledgeReconciliationReport200JSONResponseBodyStatusAcknowledged OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus = "acknowledged"
+	OpsAcknowledgeReconciliationReport200JSONResponseBodyStatusOpen         OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus = "open"
+)
+
+// Valid indicates whether the value is a known member of the OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus enum.
+func (e OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus) Valid() bool {
+	switch e {
+	case OpsAcknowledgeReconciliationReport200JSONResponseBodyStatusAcknowledged:
+		return true
+	case OpsAcknowledgeReconciliationReport200JSONResponseBodyStatusOpen:
 		return true
 	default:
 		return false
@@ -139,6 +178,21 @@ type CommonLimit = int
 // CommonStartingAfter defines model for common_StartingAfter.
 type CommonStartingAfter = string
 
+// OpsListUnresolvedPaymentAttemptsParams defines parameters for OpsListUnresolvedPaymentAttempts.
+type OpsListUnresolvedPaymentAttemptsParams struct {
+	Status *[]OpsListUnresolvedPaymentAttemptsParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+
+	// OlderThanSeconds 依頼からこの秒数以上たったものだけ（既定 30。自動の確定の途中を除く）
+	OlderThanSeconds *int         `form:"older_than_seconds,omitempty" json:"older_than_seconds,omitempty"`
+	Limit            *CommonLimit `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// StartingAfter 前のページの next_cursor
+	StartingAfter *CommonStartingAfter `form:"starting_after,omitempty" json:"starting_after,omitempty"`
+}
+
+// OpsListUnresolvedPaymentAttemptsParamsStatus defines parameters for OpsListUnresolvedPaymentAttempts.
+type OpsListUnresolvedPaymentAttemptsParamsStatus string
+
 // OpsResolvePaymentAttemptJSONBody defines parameters for OpsResolvePaymentAttempt.
 type OpsResolvePaymentAttemptJSONBody struct {
 	FailureCode *string                                 `json:"failure_code,omitempty"`
@@ -164,11 +218,25 @@ type OpsListReconciliationReportsParams struct {
 // OpsListReconciliationReportsParamsStatus defines parameters for OpsListReconciliationReports.
 type OpsListReconciliationReportsParamsStatus string
 
+// OpsAcknowledgeReconciliationReportJSONBody defines parameters for OpsAcknowledgeReconciliationReport.
+type OpsAcknowledgeReconciliationReportJSONBody struct {
+	Note string `json:"note"`
+}
+
+// OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus defines parameters for OpsAcknowledgeReconciliationReport.
+type OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus string
+
 // OpsResolvePaymentAttemptJSONRequestBody defines body for OpsResolvePaymentAttempt for application/json ContentType.
 type OpsResolvePaymentAttemptJSONRequestBody OpsResolvePaymentAttemptJSONBody
 
+// OpsAcknowledgeReconciliationReportJSONRequestBody defines body for OpsAcknowledgeReconciliationReport for application/json ContentType.
+type OpsAcknowledgeReconciliationReportJSONRequestBody OpsAcknowledgeReconciliationReportJSONBody
+
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+
+	// (GET /v1/ops/payment-attempts)
+	OpsListUnresolvedPaymentAttempts(w http.ResponseWriter, r *http.Request, params OpsListUnresolvedPaymentAttemptsParams)
 
 	// (GET /v1/ops/payment-attempts/{attempt_id})
 	OpsGetPaymentAttempt(w http.ResponseWriter, r *http.Request, attemptId AttemptIDPath)
@@ -178,6 +246,9 @@ type ServerInterface interface {
 
 	// (GET /v1/ops/reconciliation-reports)
 	OpsListReconciliationReports(w http.ResponseWriter, r *http.Request, params OpsListReconciliationReportsParams)
+
+	// (POST /v1/ops/reconciliation-reports/{report_id}/acknowledge)
+	OpsAcknowledgeReconciliationReport(w http.ResponseWriter, r *http.Request, reportId openapi_types.UUID)
 }
 
 // ServerInterfaceWrapper converts contexts to parameters.
@@ -188,6 +259,78 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// OpsListUnresolvedPaymentAttempts operation middleware
+func (siw *ServerInterfaceWrapper) OpsListUnresolvedPaymentAttempts(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params OpsListUnresolvedPaymentAttemptsParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "array", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "older_than_seconds" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "older_than_seconds", r.URL.Query(), &params.OlderThanSeconds, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "older_than_seconds"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "older_than_seconds", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "starting_after" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "starting_after", r.URL.Query(), &params.StartingAfter, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "starting_after"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "starting_after", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpsListUnresolvedPaymentAttempts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // OpsGetPaymentAttempt operation middleware
 func (siw *ServerInterfaceWrapper) OpsGetPaymentAttempt(w http.ResponseWriter, r *http.Request) {
@@ -304,6 +447,32 @@ func (siw *ServerInterfaceWrapper) OpsListReconciliationReports(w http.ResponseW
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.OpsListReconciliationReports(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// OpsAcknowledgeReconciliationReport operation middleware
+func (siw *ServerInterfaceWrapper) OpsAcknowledgeReconciliationReport(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "report_id" -------------
+	var reportId openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "report_id", r.PathValue("report_id"), &reportId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "report_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.OpsAcknowledgeReconciliationReport(w, r, reportId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -433,14 +602,58 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/payment-attempts", wrapper.OpsListUnresolvedPaymentAttempts)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/payment-attempts/{attempt_id}", wrapper.OpsGetPaymentAttempt)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/payment-attempts/{attempt_id}/resolve", wrapper.OpsResolvePaymentAttempt)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/ops/reconciliation-reports", wrapper.OpsListReconciliationReports)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/ops/reconciliation-reports/{report_id}/acknowledge", wrapper.OpsAcknowledgeReconciliationReport)
 
 	return m
 }
 
 type CommonProblemApplicationProblemPlusJSONResponse CommonProblem
+
+type OpsListUnresolvedPaymentAttemptsRequestObject struct {
+	Params OpsListUnresolvedPaymentAttemptsParams
+}
+
+type OpsListUnresolvedPaymentAttemptsResponseObject interface {
+	VisitOpsListUnresolvedPaymentAttemptsResponse(w http.ResponseWriter) error
+}
+
+type OpsListUnresolvedPaymentAttempts200JSONResponse struct {
+	Data       []Attempt `json:"data"`
+	HasMore    bool      `json:"has_more"`
+	NextCursor *string   `json:"next_cursor"`
+}
+
+func (response OpsListUnresolvedPaymentAttempts200JSONResponse) VisitOpsListUnresolvedPaymentAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpsListUnresolvedPaymentAttempts400ApplicationProblemPlusJSONResponse struct {
+	CommonProblemApplicationProblemPlusJSONResponse
+}
+
+func (response OpsListUnresolvedPaymentAttempts400ApplicationProblemPlusJSONResponse) VisitOpsListUnresolvedPaymentAttemptsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
 
 type OpsGetPaymentAttemptRequestObject struct {
 	AttemptId AttemptIDPath `json:"attempt_id"`
@@ -600,8 +813,67 @@ func (response OpsListReconciliationReports400ApplicationProblemPlusJSONResponse
 	return err
 }
 
+type OpsAcknowledgeReconciliationReportRequestObject struct {
+	ReportId openapi_types.UUID `json:"report_id"`
+	Body     *OpsAcknowledgeReconciliationReportJSONRequestBody
+}
+
+type OpsAcknowledgeReconciliationReportResponseObject interface {
+	VisitOpsAcknowledgeReconciliationReportResponse(w http.ResponseWriter) error
+}
+
+type OpsAcknowledgeReconciliationReport200JSONResponse struct {
+	Id     openapi_types.UUID                                          `json:"id"`
+	Status OpsAcknowledgeReconciliationReport200JSONResponseBodyStatus `json:"status"`
+}
+
+func (response OpsAcknowledgeReconciliationReport200JSONResponse) VisitOpsAcknowledgeReconciliationReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpsAcknowledgeReconciliationReport400ApplicationProblemPlusJSONResponse struct {
+	CommonProblemApplicationProblemPlusJSONResponse
+}
+
+func (response OpsAcknowledgeReconciliationReport400ApplicationProblemPlusJSONResponse) VisitOpsAcknowledgeReconciliationReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(400)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type OpsAcknowledgeReconciliationReport404ApplicationProblemPlusJSONResponse CommonProblem
+
+func (response OpsAcknowledgeReconciliationReport404ApplicationProblemPlusJSONResponse) VisitOpsAcknowledgeReconciliationReportResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
 // StrictServerInterface represents all server handlers.
 type StrictServerInterface interface {
+
+	// (GET /v1/ops/payment-attempts)
+	OpsListUnresolvedPaymentAttempts(ctx context.Context, request OpsListUnresolvedPaymentAttemptsRequestObject) (OpsListUnresolvedPaymentAttemptsResponseObject, error)
 
 	// (GET /v1/ops/payment-attempts/{attempt_id})
 	OpsGetPaymentAttempt(ctx context.Context, request OpsGetPaymentAttemptRequestObject) (OpsGetPaymentAttemptResponseObject, error)
@@ -611,6 +883,9 @@ type StrictServerInterface interface {
 
 	// (GET /v1/ops/reconciliation-reports)
 	OpsListReconciliationReports(ctx context.Context, request OpsListReconciliationReportsRequestObject) (OpsListReconciliationReportsResponseObject, error)
+
+	// (POST /v1/ops/reconciliation-reports/{report_id}/acknowledge)
+	OpsAcknowledgeReconciliationReport(ctx context.Context, request OpsAcknowledgeReconciliationReportRequestObject) (OpsAcknowledgeReconciliationReportResponseObject, error)
 }
 
 type StrictHandlerFunc func(ctx context.Context, w http.ResponseWriter, r *http.Request, request any) (any, error)
@@ -650,6 +925,32 @@ type strictHandler struct {
 	ssi         StrictServerInterface
 	middlewares []StrictMiddlewareFunc
 	options     StrictHTTPServerOptions
+}
+
+// OpsListUnresolvedPaymentAttempts operation middleware
+func (sh *strictHandler) OpsListUnresolvedPaymentAttempts(w http.ResponseWriter, r *http.Request, params OpsListUnresolvedPaymentAttemptsParams) {
+	var request OpsListUnresolvedPaymentAttemptsRequestObject
+
+	request.Params = params
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OpsListUnresolvedPaymentAttempts(ctx, request.(OpsListUnresolvedPaymentAttemptsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OpsListUnresolvedPaymentAttempts")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OpsListUnresolvedPaymentAttemptsResponseObject); ok {
+		if err := validResponse.VisitOpsListUnresolvedPaymentAttemptsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
 }
 
 // OpsGetPaymentAttempt operation middleware
@@ -730,6 +1031,39 @@ func (sh *strictHandler) OpsListReconciliationReports(w http.ResponseWriter, r *
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(OpsListReconciliationReportsResponseObject); ok {
 		if err := validResponse.VisitOpsListReconciliationReportsResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// OpsAcknowledgeReconciliationReport operation middleware
+func (sh *strictHandler) OpsAcknowledgeReconciliationReport(w http.ResponseWriter, r *http.Request, reportId openapi_types.UUID) {
+	var request OpsAcknowledgeReconciliationReportRequestObject
+
+	request.ReportId = reportId
+
+	var body OpsAcknowledgeReconciliationReportJSONRequestBody
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		sh.options.RequestErrorHandlerFunc(w, r, fmt.Errorf("can't decode JSON body: %w", err))
+		return
+	}
+	request.Body = &body
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.OpsAcknowledgeReconciliationReport(ctx, request.(OpsAcknowledgeReconciliationReportRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "OpsAcknowledgeReconciliationReport")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(OpsAcknowledgeReconciliationReportResponseObject); ok {
+		if err := validResponse.VisitOpsAcknowledgeReconciliationReportResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

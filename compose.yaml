@@ -67,7 +67,7 @@ services:
     environment: {SERVICE_NAME: api}
     ports: ["8080:8080"]
 
-  # 画面（事業者コンソール web/console・マイページ web/mypage の dist を配り、/v1/ と /checkout を api に渡す。task dev:container が先にビルドする）
+  # 画面（事業者コンソール web/console・マイページ web/mypage・運営者コンソール web/ops の dist を配り、/v1/ と /checkout を api に渡す。task dev:container が先にビルドする）
   web:
     image: nginx:1.29-alpine
     profiles: [app]
@@ -77,6 +77,8 @@ services:
       - ./web/console/public/config.json:/usr/share/nginx/html/console/config.json:ro
       - ./web/mypage/dist:/usr/share/nginx/html/mypage:ro
       - ./web/mypage/public/config.json:/usr/share/nginx/html/mypage/config.json:ro
+      - ./web/ops/dist:/usr/share/nginx/html/ops:ro
+      - ./web/ops/public/config.json:/usr/share/nginx/html/ops/config.json:ro
     ports: ["8090:8090"]
     depends_on: [api]
     healthcheck:

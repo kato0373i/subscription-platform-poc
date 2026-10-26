@@ -23,3 +23,5 @@ web/console/dist
 web/console/public/config.json
 web/mypage/dist
 web/mypage/public/config.json
+web/ops/dist
+web/ops/public/config.json

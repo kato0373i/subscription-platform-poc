@@ -22,6 +22,7 @@ import (
 	sk "subscription-platform/internal/sharedkernel"
 	c "subscription-platform/modules/payments/contracts"
 	paymentsdb "subscription-platform/modules/payments/db"
+	"subscription-platform/modules/payments/internal/adapter/postgres"
 	"subscription-platform/modules/payments/internal/adapter/provider"
 	"subscription-platform/modules/payments/internal/adapter/provider/stub"
 	"subscription-platform/modules/payments/internal/app"
@@ -497,5 +498,70 @@ func TestReconcileResume(t *testing.T) {
 	again, _ := f.svc.ReconcileDailyJob().Run(context.Background(), run)
 	if again["pages"] != int64(0) {
 		t.Errorf("完了済みの再実行は何もしない: %v", again)
+	}
+}
+
+// operator-console §5.1：確定していない試行の一覧（状態・経過時間で絞り、依頼の古い順にカーソルでたどる）
+func TestUnresolvedAttempts(t *testing.T) {
+	f := setup(t)
+	tenant, customer, _ := ids()
+	lost := f.method(t, customer, "timeout_lost")
+	var want []sk.PaymentAttemptID
+	for range 3 {
+		r, _ := f.svc.Collect(context.Background(), f.cmd(tenant, customer, lost, sk.NewID[sk.InvoiceTag](), 1))
+		want = append(want, r.AttemptID)
+		f.clock.Advance(time.Second)
+	}
+	ok := f.method(t, customer, "ok")
+	if _, err := f.svc.Collect(context.Background(), f.cmd(tenant, customer, ok, sk.NewID[sk.InvoiceTag](), 1)); err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	if got, _, _ := f.svc.UnresolvedAttempts(ctx, nil, 30*time.Second, nil, 10); len(got) != 0 {
+		t.Errorf("30 秒たっていない試行は出ない: %d", len(got))
+	}
+	f.clock.Advance(time.Minute)
+	var seen []sk.PaymentAttemptID
+	var after *postgres.AttemptCursor
+	for range 5 {
+		page, more, err := f.svc.UnresolvedAttempts(ctx, nil, 30*time.Second, after, 2)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, a := range page {
+			seen = append(seen, a.ID)
+		}
+		if !more {
+			break
+		}
+		last := page[len(page)-1]
+		after = &postgres.AttemptCursor{RequestedAt: last.RequestedAt, ID: last.ID.UUID()}
+	}
+	if fmt.Sprint(seen) != fmt.Sprint(want) {
+		t.Errorf("依頼の古い順に、成功した試行を除いて 3 件: got %v want %v", seen, want)
+	}
+	if got, _, _ := f.svc.UnresolvedAttempts(ctx, []string{"processing", "pending_async"}, 30*time.Second, nil, 10); len(got) != 0 {
+		t.Errorf("状態の絞り込み: %d", len(got))
+	}
+}
+
+// operator-console FR-007：照合の不整合を対応済みにする（open → acknowledged、2 回目は何もしない）
+func TestAcknowledgeDiscrepancy(t *testing.T) {
+	f := setup(t)
+	id := uuid.New()
+	f.d.AsSuper(t, fmt.Sprintf(`INSERT INTO payments.reconciliation_discrepancies (id, business_date, provider, kind, provider_order_ref, detail, detected_at) VALUES ('%s', '2026-10-24', 'stub', 'orphan_provider_charge', 'stub_x', '{}', now())`, id))
+	ctx := context.Background()
+	if _, err := f.svc.AcknowledgeDiscrepancy(ctx, id, "  "); !errors.Is(err, app.ErrInvalidNote) {
+		t.Errorf("空のメモ: %v", err)
+	}
+	row, err := f.svc.AcknowledgeDiscrepancy(ctx, id, "調査済み")
+	if err != nil || row.Status != "acknowledged" {
+		t.Fatalf("対応済み: %v %+v", err, row)
+	}
+	if again, err := f.svc.AcknowledgeDiscrepancy(ctx, id, "もう一度"); err != nil || again.Status != "acknowledged" {
+		t.Errorf("2 回目は 200 で何もしない: %v %+v", err, again)
+	}
+	if _, err := f.svc.AcknowledgeDiscrepancy(ctx, uuid.New(), "x"); !errors.Is(err, app.ErrDiscrepancyNotFound) {
+		t.Errorf("ない不整合: %v", err)
 	}
 }

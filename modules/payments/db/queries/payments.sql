@@ -151,3 +151,18 @@ WHERE (sqlc.narg('business_date')::date IS NULL OR business_date = sqlc.narg('bu
   AND (sqlc.narg('after_id')::uuid IS NULL OR id > sqlc.narg('after_id')::uuid)
 ORDER BY id
 LIMIT $1;
+
+-- name: ListUnresolvedAttemptsPage :many
+-- 運営者コンソールの確定していない試行の一覧（operator-console §5.1。ix_attempt_unresolved を使う）
+SELECT * FROM payments.payment_attempts
+WHERE status = ANY(sqlc.arg(statuses)::text[]) AND requested_at < sqlc.arg(requested_before)::timestamptz
+  AND (sqlc.narg('after_requested_at')::timestamptz IS NULL
+       OR (requested_at, id) > (sqlc.narg('after_requested_at')::timestamptz, sqlc.narg('after_id')::uuid))
+ORDER BY requested_at, id
+LIMIT sqlc.arg(lim)::int;
+
+-- name: GetDiscrepancy :one
+SELECT * FROM payments.reconciliation_discrepancies WHERE id = $1;
+
+-- name: AcknowledgeDiscrepancy :execrows
+UPDATE payments.reconciliation_discrepancies SET status = 'acknowledged' WHERE id = $1 AND status = 'open';

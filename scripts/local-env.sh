@@ -36,13 +36,15 @@ SQL
 
 # スタッフの Cognito のプール（事業者コンソール。business-console §5.2・§5.3）。Terraform の出力から読む
 # 契約者のプール（マイページ。consumer-mypage §5.4）も同じく読む
-STAFF_POOL_ID="" STAFF_CLIENT_ID="" CONSUMER_POOL_ID="" CONSUMER_CLIENT_ID=""
+STAFF_POOL_ID="" STAFF_CLIENT_ID="" CONSUMER_POOL_ID="" CONSUMER_CLIENT_ID="" OPERATOR_POOL_ID="" OPERATOR_CLIENT_ID=""
 if cog="$(./scripts/tf.sh output -json cognito 2>/dev/null)" && [[ -n "$cog" ]]; then
   pool() { printf '%s' "$cog" | python3 -c "import sys,json;print(json.load(sys.stdin).get('$1',{}).get('$2',''))" 2>/dev/null || true; }
   STAFF_POOL_ID="$(pool staff id)"
   STAFF_CLIENT_ID="$(pool staff client_id)"
   CONSUMER_POOL_ID="$(pool consumer id)"
   CONSUMER_CLIENT_ID="$(pool consumer client_id)"
+  OPERATOR_POOL_ID="$(pool operator id)"
+  OPERATOR_CLIENT_ID="$(pool operator client_id)"
 fi
 
 # MiniStack は、パスワードの方針で指定しなかった項目を「必須」として扱う（本物の Cognito は「不要」）。Terraform の provider は false の項目を
@@ -98,6 +100,11 @@ ENV
     echo "COGNITO_CONSUMER_CLIENT_ID=$CONSUMER_CLIENT_ID"
     echo "COGNITO_CONSUMER_USER_POOL_ID=$CONSUMER_POOL_ID"
   fi
+  if [[ -n "$OPERATOR_POOL_ID" ]]; then
+    echo "COGNITO_OPERATOR_ISSUER=https://cognito-idp.ap-northeast-1.amazonaws.com/$OPERATOR_POOL_ID"
+    echo "COGNITO_OPERATOR_CLIENT_ID=$OPERATOR_CLIENT_ID"
+    echo "COGNITO_OPERATOR_USER_POOL_ID=$OPERATOR_POOL_ID"
+  fi
 }
 
 {
@@ -111,6 +118,7 @@ ENV
   echo "QUEUE_URL_PREFIX=http://localhost:4566/000000000000/"
   [[ -n "$STAFF_POOL_ID" ]] && echo "COGNITO_STAFF_JWKS_URL=http://localhost:4566/$STAFF_POOL_ID/.well-known/jwks.json"
   [[ -n "$CONSUMER_POOL_ID" ]] && echo "COGNITO_CONSUMER_JWKS_URL=http://localhost:4566/$CONSUMER_POOL_ID/.well-known/jwks.json"
+  [[ -n "$OPERATOR_POOL_ID" ]] && echo "COGNITO_OPERATOR_JWKS_URL=http://localhost:4566/$OPERATOR_POOL_ID/.well-known/jwks.json"
   true
 } > .env.local
 
@@ -122,6 +130,7 @@ ENV
   echo "QUEUE_URL_PREFIX=http://ministack:4566/000000000000/"
   [[ -n "$STAFF_POOL_ID" ]] && echo "COGNITO_STAFF_JWKS_URL=http://ministack:4566/$STAFF_POOL_ID/.well-known/jwks.json"
   [[ -n "$CONSUMER_POOL_ID" ]] && echo "COGNITO_CONSUMER_JWKS_URL=http://ministack:4566/$CONSUMER_POOL_ID/.well-known/jwks.json"
+  [[ -n "$OPERATOR_POOL_ID" ]] && echo "COGNITO_OPERATOR_JWKS_URL=http://ministack:4566/$OPERATOR_POOL_ID/.well-known/jwks.json"
   true
 } > .env.container
 
@@ -137,6 +146,12 @@ cat > web/mypage/public/config.json <<JSON
 {"cognito":{"region":"ap-northeast-1","userPoolId":"$CONSUMER_POOL_ID","clientId":"$CONSUMER_CLIENT_ID","endpoint":"http://localhost:4566"}}
 JSON
 
+# 運営者コンソール（SPA）のランタイムの設定（operator-console §7）
+mkdir -p web/ops/public
+cat > web/ops/public/config.json <<JSON
+{"cognito":{"region":"ap-northeast-1","userPoolId":"$OPERATOR_POOL_ID","clientId":"$OPERATOR_CLIENT_ID","endpoint":"http://localhost:4566"}}
+JSON
+
 {
   echo "# task up が書き出す（Playwright が読む）"
   echo "API_BASE_URL=http://localhost:8080"
@@ -144,6 +159,7 @@ JSON
   echo "CONSOLE_BASE_URL=http://localhost:8090"
   echo "COGNITO_STAFF_USER_POOL_ID=$STAFF_POOL_ID"
   echo "COGNITO_CONSUMER_USER_POOL_ID=$CONSUMER_POOL_ID"
+  echo "COGNITO_OPERATOR_USER_POOL_ID=$OPERATOR_POOL_ID"
   echo "AWS_ENDPOINT_URL=http://localhost:4566"
   echo "SINK_TARGET_BASE=${SINK_TARGET_BASE:-http://localhost:18080}"
   echo "E2E_READER_URL=postgres://sp_e2e_reader:sp_e2e_reader_local@localhost:$HOST_PORT/sp?sslmode=disable"

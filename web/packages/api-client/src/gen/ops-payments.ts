@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+    "/v1/ops/payment-attempts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description 確定していない試行（依頼の古い順）。運営者コンソールの「結果が不明な決済」（operator-console §5.1） */
+        get: operations["opsListUnresolvedPaymentAttempts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ops/payment-attempts/{attempt_id}": {
         parameters: {
             query?: never;
@@ -46,6 +63,23 @@ export interface paths {
         get: operations["opsListReconciliationReports"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/ops/reconciliation-reports/{report_id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description 照合の不整合を対応済みにする。既に対応済みなら何もしない（200）。メモは監査ログに残す（operator-console ADR-O02） */
+        post: operations["opsAcknowledgeReconciliationReport"];
         delete?: never;
         options?: never;
         head?: never;
@@ -129,6 +163,38 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    opsListUnresolvedPaymentAttempts: {
+        parameters: {
+            query?: {
+                status?: ("unknown" | "processing" | "pending_async")[];
+                /** @description 依頼からこの秒数以上たったものだけ（既定 30。自動の確定の途中を除く） */
+                older_than_seconds?: number;
+                limit?: components["parameters"]["Limit"];
+                /** @description 前のページの next_cursor */
+                starting_after?: components["parameters"]["StartingAfter"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 確定していない試行 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["Attempt"][];
+                        has_more: boolean;
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+        };
+    };
     opsGetPaymentAttempt: {
         parameters: {
             query?: never;
@@ -233,6 +299,41 @@ export interface operations {
                 };
             };
             400: components["responses"]["Problem"];
+        };
+    };
+    opsAcknowledgeReconciliationReport: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                report_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    note: string;
+                };
+            };
+        };
+        responses: {
+            /** @description 対応済みの不整合 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        /** Format: uuid */
+                        id: string;
+                        /** @enum {string} */
+                        status: "open" | "acknowledged";
+                    };
+                };
+            };
+            400: components["responses"]["Problem"];
+            404: components["responses"]["Problem"];
         };
     };
 }

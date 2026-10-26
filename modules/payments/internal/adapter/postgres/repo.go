@@ -437,3 +437,41 @@ func (r *Repo) InsertDiscrepancy(ctx context.Context, d Discrepancy, now time.Ti
 func (r *Repo) ListDiscrepancies(ctx context.Context, date *sk.Date, status *string, after *uuid.UUID, limit int) ([]sqlcgen.PaymentsReconciliationDiscrepancy, error) {
 	return r.q.ListDiscrepancies(ctx, sqlcgen.ListDiscrepanciesParams{Limit: int32(limit), BusinessDate: date, Status: status, AfterID: after})
 }
+
+// AttemptCursor は確定していない試行の一覧のカーソル。
+type AttemptCursor struct {
+	RequestedAt time.Time `json:"r"`
+	ID          uuid.UUID `json:"i"`
+}
+
+// ListUnresolvedAttempts は確定していない試行（statuses）を依頼の古い順に読む（運営者コンソール）。
+func (r *Repo) ListUnresolvedAttempts(ctx context.Context, statuses []string, before time.Time, after *AttemptCursor, limit int) ([]*domain.Attempt, error) {
+	p := sqlcgen.ListUnresolvedAttemptsPageParams{Statuses: statuses, RequestedBefore: before, Lim: int32(limit)}
+	if after != nil {
+		p.AfterRequestedAt, p.AfterID = &after.RequestedAt, &after.ID
+	}
+	rows, err := r.q.ListUnresolvedAttemptsPage(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*domain.Attempt, len(rows))
+	for i, row := range rows {
+		out[i] = toAttempt(row)
+	}
+	return out, nil
+}
+
+// AcknowledgeDiscrepancy は照合の不整合を対応済みにする。変わったら true、既に対応済みなら false、なければ ErrNotFound。
+func (r *Repo) AcknowledgeDiscrepancy(ctx context.Context, id uuid.UUID) (bool, error) {
+	n, err := r.q.AcknowledgeDiscrepancy(ctx, id)
+	if err != nil {
+		return false, err
+	}
+	if n == 1 {
+		return true, nil
+	}
+	if _, err := r.q.GetDiscrepancy(ctx, id); err != nil {
+		return false, notFound(err)
+	}
+	return false, nil
+}

@@ -2,6 +2,28 @@
 openapi: 3.0.3
 info: {title: ops-payments, version: "1"}
 paths:
+  /v1/ops/payment-attempts:
+    get:
+      operationId: opsListUnresolvedPaymentAttempts
+      description: 確定していない試行（依頼の古い順）。運営者コンソールの「結果が不明な決済」（operator-console §5.1）
+      parameters:
+        - {name: status, in: query, style: form, explode: true, schema: {type: array, items: {type: string, enum: [unknown, processing, pending_async]}}}
+        - {name: older_than_seconds, in: query, description: 依頼からこの秒数以上たったものだけ（既定 30。自動の確定の途中を除く）, schema: {type: integer, minimum: 0, maximum: 2592000}}
+        - {$ref: '../common.yaml#/components/parameters/Limit'}
+        - {$ref: '../common.yaml#/components/parameters/StartingAfter'}
+      responses:
+        "200":
+          description: 確定していない試行
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, has_more, next_cursor]
+                properties:
+                  data: {type: array, items: {$ref: '#/components/schemas/Attempt'}}
+                  has_more: {type: boolean}
+                  next_cursor: {type: string, nullable: true}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
   /v1/ops/payment-attempts/{attempt_id}:
     get:
       operationId: opsGetPaymentAttempt
@@ -70,6 +92,35 @@ paths:
                   has_more: {type: boolean}
                   next_cursor: {type: string, nullable: true}
         "400": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/ops/reconciliation-reports/{report_id}/acknowledge:
+    post:
+      operationId: opsAcknowledgeReconciliationReport
+      description: 照合の不整合を対応済みにする。既に対応済みなら何もしない（200）。メモは監査ログに残す（operator-console ADR-O02）
+      parameters:
+        - {name: report_id, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [note]
+              properties:
+                note: {type: string, minLength: 1, maxLength: 1000}
+      responses:
+        "200":
+          description: 対応済みの不整合
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status]
+                properties:
+                  id: {type: string, format: uuid}
+                  status: {type: string, enum: [open, acknowledged]}
+        "400": {$ref: '../common.yaml#/components/responses/Problem'}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
 components:
   parameters:
     AttemptIDPath: {name: attempt_id, in: path, required: true, schema: {type: string, format: uuid}}

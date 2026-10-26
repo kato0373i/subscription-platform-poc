@@ -13,6 +13,18 @@ import (
 	sk "subscription-platform/internal/sharedkernel"
 )
 
+const acknowledgeDiscrepancy = `-- name: AcknowledgeDiscrepancy :execrows
+UPDATE payments.reconciliation_discrepancies SET status = 'acknowledged' WHERE id = $1 AND status = 'open'
+`
+
+func (q *Queries) AcknowledgeDiscrepancy(ctx context.Context, id uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, acknowledgeDiscrepancy, id)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const countActivePaymentMethods = `-- name: CountActivePaymentMethods :one
 SELECT count(*) FROM payments.payment_methods WHERE customer_account_id = $1 AND status = 'active'
 `
@@ -414,6 +426,28 @@ func (q *Queries) GetBreaker(ctx context.Context, provider string) (PaymentsProv
 		&i.ConsecutiveFailures,
 		&i.OpenUntil,
 		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const getDiscrepancy = `-- name: GetDiscrepancy :one
+SELECT id, business_date, provider, kind, attempt_id, tenant_id, provider_order_ref, detail, status, detected_at FROM payments.reconciliation_discrepancies WHERE id = $1
+`
+
+func (q *Queries) GetDiscrepancy(ctx context.Context, id uuid.UUID) (PaymentsReconciliationDiscrepancy, error) {
+	row := q.db.QueryRow(ctx, getDiscrepancy, id)
+	var i PaymentsReconciliationDiscrepancy
+	err := row.Scan(
+		&i.ID,
+		&i.BusinessDate,
+		&i.Provider,
+		&i.Kind,
+		&i.AttemptID,
+		&i.TenantID,
+		&i.ProviderOrderRef,
+		&i.Detail,
+		&i.Status,
+		&i.DetectedAt,
 	)
 	return i, err
 }
@@ -912,6 +946,80 @@ func (q *Queries) ListUnresolvedAttempts(ctx context.Context, arg ListUnresolved
 			return nil, err
 		}
 		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUnresolvedAttemptsPage = `-- name: ListUnresolvedAttemptsPage :many
+SELECT id, tenant_id, payable_type, payable_id, customer_account_id, payment_method_id, method_type, provider, tenant_shop_id, amount, idempotency_key, collection_seq, request_hash, provider_order_ref, status, failure_code, failure_retryable, provider_raw_code, next_action, resolution, resolved_by, resolve_note, check_count, last_checked_at, requested_at, finalized_at, version, created_at, updated_at FROM payments.payment_attempts
+WHERE status = ANY($1::text[]) AND requested_at < $2::timestamptz
+  AND ($3::timestamptz IS NULL
+       OR (requested_at, id) > ($3::timestamptz, $4::uuid))
+ORDER BY requested_at, id
+LIMIT $5::int
+`
+
+type ListUnresolvedAttemptsPageParams struct {
+	Statuses         []string
+	RequestedBefore  time.Time
+	AfterRequestedAt *time.Time
+	AfterID          *uuid.UUID
+	Lim              int32
+}
+
+// 運営者コンソールの確定していない試行の一覧（operator-console §5.1。ix_attempt_unresolved を使う）
+func (q *Queries) ListUnresolvedAttemptsPage(ctx context.Context, arg ListUnresolvedAttemptsPageParams) ([]PaymentsPaymentAttempt, error) {
+	rows, err := q.db.Query(ctx, listUnresolvedAttemptsPage,
+		arg.Statuses,
+		arg.RequestedBefore,
+		arg.AfterRequestedAt,
+		arg.AfterID,
+		arg.Lim,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []PaymentsPaymentAttempt
+	for rows.Next() {
+		var i PaymentsPaymentAttempt
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.PayableType,
+			&i.PayableID,
+			&i.CustomerAccountID,
+			&i.PaymentMethodID,
+			&i.MethodType,
+			&i.Provider,
+			&i.TenantShopID,
+			&i.Amount,
+			&i.IdempotencyKey,
+			&i.CollectionSeq,
+			&i.RequestHash,
+			&i.ProviderOrderRef,
+			&i.Status,
+			&i.FailureCode,
+			&i.FailureRetryable,
+			&i.ProviderRawCode,
+			&i.NextAction,
+			&i.Resolution,
+			&i.ResolvedBy,
+			&i.ResolveNote,
+			&i.CheckCount,
+			&i.LastCheckedAt,
+			&i.RequestedAt,
+			&i.FinalizedAt,
+			&i.Version,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

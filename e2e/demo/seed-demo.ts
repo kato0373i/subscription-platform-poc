@@ -1,7 +1,7 @@
 // デモデータの投入（ローカル専用。task demo:seed）。まっさらな環境（task reset → up → dev:container）で流す。
 // dev clock を 1 日ずつ進めながら、約 12 か月分の事業の動き（申込・トライアル・プラン変更・支払い失敗と回復・解約）を本物の API で作る。
 // dev clock は戻せないので、履歴は「今日」から 12 か月先までになり、最後の日がコンソールの「今日」になる。
-// 事業者コンソールのログイン用の Cognito アカウント（owner・admin・viewer）を作り、ログイン情報を .local/demo-accounts.md に書く。
+// 事業者コンソールのログイン用の Cognito アカウント（owner・admin・viewer）・マイページの契約者・運営者コンソールの運営者を作り、ログイン情報を .local/demo-accounts.md に書く。
 import { randomUUID } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import pg from "pg";
@@ -10,6 +10,7 @@ const API = process.env.API_BASE_URL ?? "http://localhost:8080";
 const AWS = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
 const POOL = process.env.COGNITO_STAFF_USER_POOL_ID ?? "";
 const CONSUMER_POOL = process.env.COGNITO_CONSUMER_USER_POOL_ID ?? "";
+const OPERATOR_POOL = process.env.COGNITO_OPERATOR_USER_POOL_ID ?? "";
 const CONSOLE = process.env.CONSOLE_BASE_URL ?? "http://localhost:8090";
 const MONTHS = Number(process.env.DEMO_MONTHS ?? "12");
 // DATE（1082）は文字列のまま受け取る（Date にするとローカル時刻で日付がずれる）
@@ -321,6 +322,14 @@ async function main() {
     await cognito("AdminSetUserPassword", { UserPoolId: POOL, Username: st.subject, Password: pw, Permanent: true });
     lines.push(`| ${a.label} | \`${a.email}\` | \`${pw}\` |`);
   }
+  // 運営者コンソールの運営者（本番と同じく管理者が作り、グループ operators に入れる。operator-console §5.3）
+  const operator = { email: "operator@demo.example.com", password: password() };
+  await cognito("AdminCreateUser", {
+    UserPoolId: OPERATOR_POOL, Username: operator.email, MessageAction: "SUPPRESS",
+    UserAttributes: [{ Name: "email", Value: operator.email }, { Name: "email_verified", Value: "true" }],
+  });
+  await cognito("AdminSetUserPassword", { UserPoolId: OPERATOR_POOL, Username: operator.email, Password: operator.password, Permanent: true });
+  await cognito("AdminAddUserToGroup", { UserPoolId: OPERATOR_POOL, Username: operator.email, GroupName: "operators" });
   // オーナーは 2 つ目の事業者にも所属する（既存のアカウントなので、すぐに有効になる）
   await must("POST", "/v1/console/staff", { token: owner, tenantId: second.id, body: { email: accounts[0]!.email, display_name: accounts[0]!.name, role: "owner" } });
 
@@ -348,6 +357,14 @@ async function main() {
       "| メールアドレス | パスワード |",
       "|---|---|",
       `| \`${demoConsumer.email}\` | \`${demoConsumer.password}\` |`,
+      "",
+      "## 運営者コンソール",
+      "",
+      `- 運営者コンソール：${CONSOLE}/ops/login`,
+      "",
+      "| メールアドレス | パスワード |",
+      "|---|---|",
+      `| \`${operator.email}\` | \`${operator.password}\` |`,
       "",
       "`task reset` で消える。作り直すときは `task reset` → `task up` → `task dev:container` → `task demo:seed`。",
       "",

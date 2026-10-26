@@ -3,12 +3,16 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 
+	"subscription-platform/internal/platform/auditctx"
 	"subscription-platform/internal/platform/db"
 	"subscription-platform/internal/platform/observability"
 	"subscription-platform/internal/platform/scheduler"
@@ -17,6 +21,7 @@ import (
 	"subscription-platform/modules/payments/internal/adapter/postgres"
 	"subscription-platform/modules/payments/internal/adapter/postgres/sqlcgen"
 	"subscription-platform/modules/payments/internal/adapter/provider"
+	"subscription-platform/modules/payments/internal/domain"
 )
 
 // ReconcileDailyJobName は日次照合（毎日 03:00 JST、前日分。§8.3）。
@@ -189,4 +194,70 @@ func (s *Service) Reports(ctx context.Context, date *sk.Date, status *string, af
 		return rows[:limit], true, nil
 	}
 	return rows, false, nil
+}
+
+// ErrDiscrepancyNotFound は照合の不整合がない。
+var ErrDiscrepancyNotFound = errors.New("payments: discrepancy not found")
+
+// ErrInvalidNote は対応のメモが空か長すぎる。
+var ErrInvalidNote = errors.New("payments: note must be 1-1000 characters")
+
+// AcknowledgeDiscrepancy は照合の不整合を対応済みにする（operator-console FR-007）。既に対応済みなら何もしない。
+// メモと運営者は監査ログに残す（ADR-O02）。
+func (s *Service) AcknowledgeDiscrepancy(ctx context.Context, id uuid.UUID, note string) (sqlcgen.PaymentsReconciliationDiscrepancy, error) {
+	note = strings.TrimSpace(note)
+	if n := utf8.RuneCountInString(note); n == 0 || n > 1000 {
+		return sqlcgen.PaymentsReconciliationDiscrepancy{}, ErrInvalidNote
+	}
+	var row sqlcgen.PaymentsReconciliationDiscrepancy
+	var changed bool
+	err := s.d.DB.InTx(system(ctx, "ops_acknowledge"), func(ctx context.Context, tx db.Tx) error {
+		repo := postgres.New(tx)
+		var err error
+		if changed, err = repo.AcknowledgeDiscrepancy(ctx, id); err != nil {
+			return mapNotFound(err, ErrDiscrepancyNotFound)
+		}
+		row, err = sqlcgen.New(tx).GetDiscrepancy(ctx, id)
+		return err
+	})
+	if err != nil {
+		return row, err
+	}
+	if changed {
+		var opts []auditctx.Option
+		if row.TenantID != nil {
+			opts = append(opts, auditctx.WithTenant(sk.IDFromUUID[sk.TenantTag](*row.TenantID)))
+		}
+		auditctx.Annotate(ctx, "reconciliation.acknowledge", auditctx.Target{Type: "reconciliation_discrepancy", ID: id.String()},
+			map[string]any{"status": "open"}, map[string]any{"status": "acknowledged", "note": note}, opts...)
+	}
+	return row, nil
+}
+
+// UnresolvedStatuses は確定していない試行の状態。
+var UnresolvedStatuses = []string{"unknown", "processing", "pending_async"}
+
+// UnresolvedAttempts は確定していない試行（依頼から olderThan 以上たったもの）を古い順に読む（operator-console FR-006）。
+func (s *Service) UnresolvedAttempts(ctx context.Context, statuses []string, olderThan time.Duration, after *postgres.AttemptCursor, limit int) ([]domain.AttemptState, bool, error) {
+	if len(statuses) == 0 {
+		statuses = UnresolvedStatuses
+	}
+	var out []domain.AttemptState
+	err := s.d.DB.ReadTx(system(ctx, "ops_unresolved"), func(ctx context.Context, tx db.Tx) error {
+		rows, err := postgres.New(tx).ListUnresolvedAttempts(ctx, statuses, s.d.Clock.Now().Add(-olderThan), after, limit+1)
+		if err != nil {
+			return err
+		}
+		for _, a := range rows {
+			out = append(out, a.State())
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	if len(out) > limit {
+		return out[:limit], true, nil
+	}
+	return out, false, nil
 }
