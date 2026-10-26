@@ -175,7 +175,8 @@ func Drain(t testing.TB, url string) []string {
 	var bodies []string
 	empty := 0
 	for empty < 2 {
-		out, err := c.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{QueueUrl: aws.String(url), MaxNumberOfMessages: 10, WaitTimeSeconds: 1})
+		// 消し損ねたメッセージが受信のあいだに見えるようになって重複に数えられないよう、可視性タイムアウトを長くする
+		out, err := c.ReceiveMessage(ctx, &sqs.ReceiveMessageInput{QueueUrl: aws.String(url), MaxNumberOfMessages: 10, WaitTimeSeconds: 1, VisibilityTimeout: 300})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -186,7 +187,9 @@ func Drain(t testing.TB, url string) []string {
 		empty = 0
 		for _, m := range out.Messages {
 			bodies = append(bodies, aws.ToString(m.Body))
-			_, _ = c.DeleteMessage(ctx, &sqs.DeleteMessageInput{QueueUrl: aws.String(url), ReceiptHandle: m.ReceiptHandle})
+			if _, err := c.DeleteMessage(ctx, &sqs.DeleteMessageInput{QueueUrl: aws.String(url), ReceiptHandle: m.ReceiptHandle}); err != nil {
+				t.Logf("awstest: メッセージを消せなかった: %v", err)
+			}
 		}
 	}
 	return bodies
