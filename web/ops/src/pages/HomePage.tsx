@@ -17,8 +17,8 @@ function Tile(p: { label: string; value: string | undefined; unit: string; atten
   const navigate = useNavigate();
   const hot = p.attention && p.value !== undefined && p.value !== "0";
   return (
-    <UnstyledButton onClick={() => navigate(p.to)} data-testid={p.testid}>
-      <Paper p="lg" style={hot ? { borderColor: "var(--mantine-color-orange-4)", background: "var(--mantine-color-orange-0)" } : undefined}>
+    <UnstyledButton onClick={() => navigate(p.to)} data-testid={p.testid} h="100%">
+      <Paper p="lg" h="100%" style={hot ? { borderColor: "var(--mantine-color-orange-4)", background: "var(--mantine-color-orange-0)" } : undefined}>
         <Group justify="space-between" align="flex-start">
           <Text size="sm" c="dimmed" fw={500}>
             {p.label}
