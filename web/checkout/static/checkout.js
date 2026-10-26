@@ -1,6 +1,7 @@
 // 最小の申込ページ（payments.md §7.10、憲章 §3「HTML 1 枚」）。
 //   /checkout?plan_id=<id>#token=<consumer の JWT>          新しい申込
-//   /checkout?subscription=<id>#token=<consumer の JWT>     支払方法の変更（支払い遅延のメールのリンク）
+//   /checkout?subscription=<id>#token=<consumer の JWT>     支払方法の変更（互換のため残す。メールのリンクはマイページに変えた）
+// トークンがなければ、マイページのログイン・登録へ案内し、戻るときにトークンを受け取る（consumer-mypage FR-011）。
 // トークンは URL のフラグメント（サーバーに送られない）で受け取り、読んだらアドレスバーから消してメモリにだけ持つ。
 (function () {
   "use strict";
@@ -135,7 +136,21 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     if (!accessToken) {
-      show("error", messages.unauthenticated);
+      if (!planId) {
+        show("error", messages.unauthenticated);
+        return;
+      }
+      // プランの内容は見せ、カードの入力の代わりにログイン・登録への導線を出す
+      var back = encodeURIComponent(location.pathname + location.search);
+      $("login-link").href = "/mypage/login?return=" + back;
+      $("signup-link").href = "/mypage/signup?return=" + back;
+      $("card").hidden = true;
+      $("extra").hidden = true;
+      $("submit").hidden = true;
+      $("login").hidden = false;
+      loadPlan().catch(function (res) {
+        show("error", res && res.status ? problemText(res) : "ページを読み込めませんでした。");
+      });
       return;
     }
     Promise.all([loadPlan(), loadTokenizer()])

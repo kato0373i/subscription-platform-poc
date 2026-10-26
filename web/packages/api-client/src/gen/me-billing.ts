@@ -27,6 +27,8 @@ export interface components {
         MeInvoice: {
             /** Format: uuid */
             id: string;
+            /** @description 決済の試行の回数（マイページが即時の再決済の結果を知るために使う。consumer-mypage §7） */
+            attempt_count: number;
             /**
              * @description payment_unknown は processing として返す
              * @enum {string}

@@ -42,16 +42,16 @@ func (e MeSubscriptionCancelReason) Valid() bool {
 
 // Defines values for MeSubscriptionInterval.
 const (
-	Month MeSubscriptionInterval = "month"
-	Year  MeSubscriptionInterval = "year"
+	MeSubscriptionIntervalMonth MeSubscriptionInterval = "month"
+	MeSubscriptionIntervalYear  MeSubscriptionInterval = "year"
 )
 
 // Valid indicates whether the value is a known member of the MeSubscriptionInterval enum.
 func (e MeSubscriptionInterval) Valid() bool {
 	switch e {
-	case Month:
+	case MeSubscriptionIntervalMonth:
 		return true
-	case Year:
+	case MeSubscriptionIntervalYear:
 		return true
 	default:
 		return false
@@ -106,30 +106,60 @@ func (e Status) Valid() bool {
 	}
 }
 
+// Defines values for MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval.
+const (
+	MeListPlanChangeOptions200JSONResponseBodyDataBillingIntervalMonth MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval = "month"
+	MeListPlanChangeOptions200JSONResponseBodyDataBillingIntervalYear  MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval = "year"
+)
+
+// Valid indicates whether the value is a known member of the MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval enum.
+func (e MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval) Valid() bool {
+	switch e {
+	case MeListPlanChangeOptions200JSONResponseBodyDataBillingIntervalMonth:
+		return true
+	case MeListPlanChangeOptions200JSONResponseBodyDataBillingIntervalYear:
+		return true
+	default:
+		return false
+	}
+}
+
 // MeSubscription defines model for MeSubscription.
 type MeSubscription struct {
 	AppliedDiscount *struct {
 		RemainingCycles int `json:"remaining_cycles"`
 	} `json:"applied_discount"`
-	CancelReason          *MeSubscriptionCancelReason `json:"cancel_reason"`
-	CanceledAt            *time.Time                  `json:"canceled_at"`
-	CreatedAt             time.Time                   `json:"created_at"`
-	CurrentPeriod         Period                      `json:"current_period"`
-	Entitled              bool                        `json:"entitled"`
-	Id                    openapi_types.UUID          `json:"id"`
-	Interval              MeSubscriptionInterval      `json:"interval"`
-	NextRenewalDate       *openapi_types.Date         `json:"next_renewal_date"`
-	PaymentMethodId       openapi_types.UUID          `json:"payment_method_id"`
-	PlanId                openapi_types.UUID          `json:"plan_id"`
-	PriceVersionId        openapi_types.UUID          `json:"price_version_id"`
-	ProductId             openapi_types.UUID          `json:"product_id"`
-	Quantity              int                         `json:"quantity"`
-	RenewalInProgress     bool                        `json:"renewal_in_progress"`
-	ScheduledCancellation *ScheduledCancellation      `json:"scheduled_cancellation"`
-	ScheduledPlanChange   *ScheduledPlanChange        `json:"scheduled_plan_change"`
-	Status                Status                      `json:"status"`
-	TenantId              openapi_types.UUID          `json:"tenant_id"`
-	Trial                 *Period                     `json:"trial"`
+	CancelReason  *MeSubscriptionCancelReason `json:"cancel_reason"`
+	CanceledAt    *time.Time                  `json:"canceled_at"`
+	CreatedAt     time.Time                   `json:"created_at"`
+	CurrentPeriod Period                      `json:"current_period"`
+
+	// Display 表示用の値（consumer-mypage ADR-M01）。取得できなければ null
+	Display *struct {
+		// Amount unit_amount × 数量
+		Amount      int64  `json:"amount"`
+		PlanName    string `json:"plan_name"`
+		ProductName string `json:"product_name"`
+		TenantName  string `json:"tenant_name"`
+
+		// UnitAmount 契約の価格バージョンの金額（税込。価格の改定の後も契約時の価格）
+		UnitAmount int64 `json:"unit_amount"`
+	} `json:"display"`
+	Entitled              bool                   `json:"entitled"`
+	Id                    openapi_types.UUID     `json:"id"`
+	Interval              MeSubscriptionInterval `json:"interval"`
+	NextRenewalDate       *openapi_types.Date    `json:"next_renewal_date"`
+	PaymentMethodId       openapi_types.UUID     `json:"payment_method_id"`
+	PlanId                openapi_types.UUID     `json:"plan_id"`
+	PriceVersionId        openapi_types.UUID     `json:"price_version_id"`
+	ProductId             openapi_types.UUID     `json:"product_id"`
+	Quantity              int                    `json:"quantity"`
+	RenewalInProgress     bool                   `json:"renewal_in_progress"`
+	ScheduledCancellation *ScheduledCancellation `json:"scheduled_cancellation"`
+	ScheduledPlanChange   *ScheduledPlanChange   `json:"scheduled_plan_change"`
+	Status                Status                 `json:"status"`
+	TenantId              openapi_types.UUID     `json:"tenant_id"`
+	Trial                 *Period                `json:"trial"`
 }
 
 // MeSubscriptionCancelReason defines model for MeSubscription.CancelReason.
@@ -199,6 +229,9 @@ type MeListSubscriptionsParams struct {
 	StartingAfter *CommonStartingAfter `form:"starting_after,omitempty" json:"starting_after,omitempty"`
 }
 
+// MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval defines parameters for MeListPlanChangeOptions.
+type MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval string
+
 // MeScheduleCancellationJSONBody defines parameters for MeScheduleCancellation.
 type MeScheduleCancellationJSONBody = map[string]interface{}
 
@@ -221,6 +254,9 @@ type ServerInterface interface {
 
 	// (GET /v1/me/subscriptions/{subscription_id})
 	MeGetSubscription(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIDPath)
+
+	// (GET /v1/me/subscriptions/{subscription_id}/plan-change-options)
+	MeListPlanChangeOptions(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIDPath)
 
 	// (DELETE /v1/me/subscriptions/{subscription_id}/scheduled-cancellation)
 	MeRevokeCancellation(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIDPath)
@@ -320,6 +356,32 @@ func (siw *ServerInterfaceWrapper) MeGetSubscription(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.MeGetSubscription(w, r, subscriptionId)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MeListPlanChangeOptions operation middleware
+func (siw *ServerInterfaceWrapper) MeListPlanChangeOptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "subscription_id" -------------
+	var subscriptionId SubscriptionIDPath
+
+	err = runtime.BindStyledParameterWithOptions("simple", "subscription_id", r.PathValue("subscription_id"), &subscriptionId, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "subscription_id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MeListPlanChangeOptions(w, r, subscriptionId)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -555,6 +617,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me/subscriptions", wrapper.MeListSubscriptions)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me/subscriptions/{subscription_id}", wrapper.MeGetSubscription)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/me/subscriptions/{subscription_id}/plan-change-options", wrapper.MeListPlanChangeOptions)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/me/subscriptions/{subscription_id}/scheduled-cancellation", wrapper.MeRevokeCancellation)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/me/subscriptions/{subscription_id}/scheduled-cancellation", wrapper.MeScheduleCancellation)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/me/subscriptions/{subscription_id}/scheduled-plan-change", wrapper.MeRevokePlanChange)
@@ -634,6 +697,55 @@ type MeGetSubscription404ApplicationProblemPlusJSONResponse struct {
 }
 
 func (response MeGetSubscription404ApplicationProblemPlusJSONResponse) VisitMeGetSubscriptionResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/problem+json")
+	w.WriteHeader(404)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MeListPlanChangeOptionsRequestObject struct {
+	SubscriptionId SubscriptionIDPath `json:"subscription_id"`
+}
+
+type MeListPlanChangeOptionsResponseObject interface {
+	VisitMeListPlanChangeOptionsResponse(w http.ResponseWriter) error
+}
+
+type MeListPlanChangeOptions200JSONResponse struct {
+	Data []struct {
+		// Amount 税込の円（現在の価格）
+		Amount          int64                                                         `json:"amount"`
+		BillingInterval MeListPlanChangeOptions200JSONResponseBodyDataBillingInterval `json:"billing_interval"`
+
+		// EffectiveDate いま予約したときの適用日
+		EffectiveDate openapi_types.Date `json:"effective_date"`
+		Name          string             `json:"name"`
+		PlanId        openapi_types.UUID `json:"plan_id"`
+	} `json:"data"`
+}
+
+func (response MeListPlanChangeOptions200JSONResponse) VisitMeListPlanChangeOptionsResponse(w http.ResponseWriter) error {
+
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(response); err != nil {
+		return err
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(200)
+	_, err := buf.WriteTo(w)
+	return err
+}
+
+type MeListPlanChangeOptions404ApplicationProblemPlusJSONResponse struct {
+	CommonProblemApplicationProblemPlusJSONResponse
+}
+
+func (response MeListPlanChangeOptions404ApplicationProblemPlusJSONResponse) VisitMeListPlanChangeOptionsResponse(w http.ResponseWriter) error {
 
 	var buf bytes.Buffer
 	if err := json.NewEncoder(&buf).Encode(response); err != nil {
@@ -878,6 +990,9 @@ type StrictServerInterface interface {
 	// (GET /v1/me/subscriptions/{subscription_id})
 	MeGetSubscription(ctx context.Context, request MeGetSubscriptionRequestObject) (MeGetSubscriptionResponseObject, error)
 
+	// (GET /v1/me/subscriptions/{subscription_id}/plan-change-options)
+	MeListPlanChangeOptions(ctx context.Context, request MeListPlanChangeOptionsRequestObject) (MeListPlanChangeOptionsResponseObject, error)
+
 	// (DELETE /v1/me/subscriptions/{subscription_id}/scheduled-cancellation)
 	MeRevokeCancellation(ctx context.Context, request MeRevokeCancellationRequestObject) (MeRevokeCancellationResponseObject, error)
 
@@ -975,6 +1090,32 @@ func (sh *strictHandler) MeGetSubscription(w http.ResponseWriter, r *http.Reques
 		sh.options.ResponseErrorHandlerFunc(w, r, err)
 	} else if validResponse, ok := response.(MeGetSubscriptionResponseObject); ok {
 		if err := validResponse.VisitMeGetSubscriptionResponse(w); err != nil {
+			sh.options.ResponseErrorHandlerFunc(w, r, err)
+		}
+	} else if response != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, fmt.Errorf("unexpected response type: %T", response))
+	}
+}
+
+// MeListPlanChangeOptions operation middleware
+func (sh *strictHandler) MeListPlanChangeOptions(w http.ResponseWriter, r *http.Request, subscriptionId SubscriptionIDPath) {
+	var request MeListPlanChangeOptionsRequestObject
+
+	request.SubscriptionId = subscriptionId
+
+	handler := func(ctx context.Context, w http.ResponseWriter, r *http.Request, request interface{}) (interface{}, error) {
+		return sh.ssi.MeListPlanChangeOptions(ctx, request.(MeListPlanChangeOptionsRequestObject))
+	}
+	for _, middleware := range sh.middlewares {
+		handler = middleware(handler, "MeListPlanChangeOptions")
+	}
+
+	response, err := handler(r.Context(), w, r, request)
+
+	if err != nil {
+		sh.options.ResponseErrorHandlerFunc(w, r, err)
+	} else if validResponse, ok := response.(MeListPlanChangeOptionsResponseObject); ok {
+		if err := validResponse.VisitMeListPlanChangeOptionsResponse(w); err != nil {
 			sh.options.ResponseErrorHandlerFunc(w, r, err)
 		}
 	} else if response != nil {

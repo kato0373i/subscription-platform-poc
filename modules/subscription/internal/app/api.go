@@ -146,3 +146,87 @@ func (s *Service) Entitlements(ctx context.Context, cus string, product *uuid.UU
 	}
 	return entitledAny, out, nil
 }
+
+// PlanOption はプラン変更の候補（consumer-mypage §5.1）。
+type PlanOption struct {
+	PlanID        sk.PlanID
+	Name          string
+	Interval      sk.BillingInterval
+	Amount        sk.Money
+	EffectiveDate sk.Date
+}
+
+// PlanChangeOptions は同じ商品の公開中のプランのうち、現在のプラン以外（適用日つき）。
+// 予約できない状態（支払い遅延・解約の予約中・終了）なら空。
+func (s *Service) PlanChangeOptions(ctx context.Context, id sk.SubscriptionID) ([]PlanOption, error) {
+	var x *domain.Subscription
+	err := s.d.DB.ReadTx(ctx, func(ctx context.Context, tx db.Tx) error {
+		var err error
+		x, err = postgres.New(tx).Get(ctx, id)
+		return mapNotFound(err)
+	})
+	if err != nil {
+		return nil, err
+	}
+	st := x.State()
+	if (st.Status != c.StatusTrialing && st.Status != c.StatusActive) || st.Cancellation != nil || st.NextRenewalDate == nil {
+		return []PlanOption{}, nil
+	}
+	plans, err := s.d.Catalog.ListPurchasablePlans(db.ClearScope(ctx), st.TenantID, st.ProductID)
+	if err != nil {
+		return nil, err
+	}
+	eff := x.PlanChangeDate(sk.DateOf(s.d.Clock.Now()))
+	out := []PlanOption{}
+	for _, p := range plans {
+		if p.PlanID == st.PlanID {
+			continue
+		}
+		out = append(out, PlanOption{PlanID: p.PlanID, Name: p.Name, Interval: p.Interval, Amount: p.Amount, EffectiveDate: eff})
+	}
+	return out, nil
+}
+
+// Display は契約の表示用の値（consumer-mypage ADR-M01）。
+type Display struct {
+	TenantName  string   `json:"tenant_name"`
+	ProductName string   `json:"product_name"`
+	PlanName    string   `json:"plan_name"`
+	UnitAmount  int64  `json:"unit_amount"`
+	Amount      int64  `json:"amount"`
+}
+
+// Displays は契約ごとの表示用の値。プラン・価格バージョンごとに 1 回だけ catalog を呼ぶ。取れなかった契約は含めない（画面は「—」）。
+func (s *Service) Displays(ctx context.Context, views []c.SubscriptionView) map[sk.SubscriptionID]Display {
+	type planKey struct {
+		t sk.TenantID
+		p sk.PlanID
+	}
+	descs := map[planKey]*catalogcontracts.PlanDescription{}
+	prices := map[sk.PriceVersionID]*int64{}
+	cctx := db.ClearScope(ctx)
+	out := map[sk.SubscriptionID]Display{}
+	for _, v := range views {
+		k := planKey{v.TenantID, v.PlanID}
+		d, ok := descs[k]
+		if !ok {
+			if got, err := s.d.Catalog.DescribePlan(cctx, v.TenantID, v.PlanID); err == nil {
+				d = &got
+			}
+			descs[k] = d
+		}
+		pr, ok := prices[v.PriceVersionID]
+		if !ok {
+			if q, err := s.d.Catalog.QuotePrice(cctx, v.TenantID, v.PriceVersionID, nil); err == nil {
+				a := q.Amount.Int64()
+				pr = &a
+			}
+			prices[v.PriceVersionID] = pr
+		}
+		if d == nil || pr == nil {
+			continue
+		}
+		out[v.ID] = Display{TenantName: d.TenantName, ProductName: d.ProductName, PlanName: d.PlanName, UnitAmount: *pr, Amount: *pr * int64(max(v.Quantity, 1))}
+	}
+	return out
+}

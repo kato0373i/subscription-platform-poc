@@ -44,8 +44,8 @@ tasks:
       # コンテナは nonroot（uid 65532）で .local/logs に書く。Linux（CI）ではバインドマウントの権限がそのまま効くので、
       # ローカル専用のログ置き場を誰でも書けるようにしておく（macOS の Docker Desktop では不要だが害もない）
       - mkdir -p .local/logs && chmod a+rwx .local/logs && (chmod a+rw .local/logs/*.jsonl 2>/dev/null || true)
-      - npx -y pnpm@9.15.9 --filter @sp/console build
-      - docker compose --profile app up -d --build --wait api worker-billing worker-integration worker-projection console
+      - npx -y pnpm@9.15.9 --filter @sp/console --filter @sp/mypage build
+      - docker compose --profile app up -d --build --wait api worker-billing worker-integration worker-projection web
       - ./scripts/wait-ready.sh
 
   down:

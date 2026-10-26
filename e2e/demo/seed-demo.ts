@@ -9,6 +9,7 @@ import pg from "pg";
 const API = process.env.API_BASE_URL ?? "http://localhost:8080";
 const AWS = process.env.AWS_ENDPOINT_URL ?? "http://localhost:4566";
 const POOL = process.env.COGNITO_STAFF_USER_POOL_ID ?? "";
+const CONSUMER_POOL = process.env.COGNITO_CONSUMER_USER_POOL_ID ?? "";
 const CONSOLE = process.env.CONSOLE_BASE_URL ?? "http://localhost:8090";
 const MONTHS = Number(process.env.DEMO_MONTHS ?? "12");
 // DATE（1082）は文字列のまま受け取る（Date にするとローカル時刻で日付がずれる）
@@ -70,17 +71,17 @@ async function one(sql: string, args: unknown[]): Promise<any> {
 }
 
 /** その日の処理（更新・回収・申込の後の非同期の処理）が終わるまで待つ。 */
-async function settle(tenantId: string, date: string) {
+async function settle(tenantIds: string[], date: string) {
   const deadline = Date.now() + 180_000;
   let stable = 0;
   while (Date.now() < deadline) {
     const at = (await now()).now;
     const r = await one(
       `SELECT
-         (SELECT count(*) FROM orchestration.billing_cycle_processes WHERE tenant_id = $1 AND outcome IS NULL) AS open,
-         (SELECT count(*) FROM subscription.subscriptions WHERE tenant_id = $1 AND status IN ('trialing','active') AND next_renewal_date <= $2) AS due,
-         (SELECT count(*) FROM billing.invoices WHERE tenant_id = $1 AND status = 'open' AND collection_mode = 'scheduled' AND next_collection_at <= $3) AS collect`,
-      [tenantId, date, at],
+         (SELECT count(*) FROM orchestration.billing_cycle_processes WHERE tenant_id = ANY($1::uuid[]) AND outcome IS NULL) AS open,
+         (SELECT count(*) FROM subscription.subscriptions WHERE tenant_id = ANY($1::uuid[]) AND status IN ('trialing','active') AND next_renewal_date <= $2) AS due,
+         (SELECT count(*) FROM billing.invoices WHERE tenant_id = ANY($1::uuid[]) AND status = 'open' AND collection_mode = 'scheduled' AND next_collection_at <= $3) AS collect`,
+      [tenantIds, date, at],
     );
     if (Number(r.open) === 0 && Number(r.due) === 0 && Number(r.collect) === 0) {
       if (++stable >= 2) return;
@@ -91,7 +92,7 @@ async function settle(tenantId: string, date: string) {
 }
 
 // ---- Cognito（MiniStack。署名は検証されない） ----
-async function cognito(action: string, body: object) {
+async function cognito<T = unknown>(action: string, body: object): Promise<T> {
   const r = await fetch(AWS, {
     method: "POST",
     headers: {
@@ -102,6 +103,8 @@ async function cognito(action: string, body: object) {
     body: JSON.stringify(body),
   });
   if (!r.ok) throw new Error(`cognito ${action}: ${r.status} ${await r.text()}`);
+  const text = await r.text();
+  return (text ? JSON.parse(text) : {}) as T;
 }
 function password(): string {
   return `Demo-${randomUUID().slice(0, 4)}${randomUUID().slice(0, 4)}Aa1!`;
@@ -176,6 +179,34 @@ async function main() {
   const subs = new Map<string, Sub>();
   let seq = 0;
 
+  // マイページのデモの契約者（Cognito の契約者のプールのアカウント）。契約者は Cognito の sub で決まるので、同じ sub の開発用 JWT で申し込む。
+  // 2 つの事業者と契約し、1 件は解約済みにする。ランダムな支払い失敗・解約の対象にはしない
+  const books = await must<{ id: string }>("POST", "/v1/ops/tenants", { token: op, body: { name: "ブックス定期便" } });
+  await must("POST", `/v1/ops/tenants/${books.id}/approve`, { token: op, body: { fincode_shop_id: `shop_demo${books.id.replaceAll("-", "").slice(0, 12)}` } });
+  await must("POST", `/v1/ops/tenants/${books.id}/staff`, { token: op, body: { subject: ownerSub, email: "api-owner@demo.example.com", display_name: "API 用オーナー", role: "owner" } });
+  const bc = async (method: string, path: string, body?: unknown) => must(method, path, { token: (owner = await ownerTok()), tenantId: books.id, body });
+  const bookProduct = await bc("POST", "/v1/console/products", { name: "毎月の本", description: "選書のプロが毎月 2 冊をお届け" });
+  const bookPlan = await bc("POST", "/v1/console/plans", { product_id: bookProduct.id, name: "2 冊コース", description: "", billing_interval: "month", trial_days: 0, pricing_scheme: "fixed", amount: 2980 });
+  await bc("POST", `/v1/console/plans/${bookPlan.id}/publish`);
+  const demoConsumer = { email: "customer@demo.example.com", name: "田中 美咲", password: `demo${randomUUID().slice(0, 6)}1` };
+  const created = await cognito<{ User: { Attributes: { Name: string; Value: string }[] } }>("AdminCreateUser", {
+    UserPoolId: CONSUMER_POOL, Username: demoConsumer.email, MessageAction: "SUPPRESS",
+    UserAttributes: [{ Name: "email", Value: demoConsumer.email }, { Name: "email_verified", Value: "true" }, { Name: "name", Value: demoConsumer.name }],
+  });
+  const demoSub = created.User.Attributes.find((a) => a.Name === "sub")!.Value;
+  await cognito("AdminSetUserPassword", { UserPoolId: CONSUMER_POOL, Username: demoSub, Password: demoConsumer.password, Permanent: true });
+  const demoTok = () => token("consumer", demoSub, demoConsumer.email, demoConsumer.name);
+  await must("GET", "/v1/me", { token: await demoTok() });
+  const demoPm = await must<{ id: string }>("POST", "/v1/me/payment-methods", {
+    token: await demoTok(), body: { method_type: "card", provider: "stub", token: `tok_stub_ok_4242_1230_${randomUUID().replaceAll("-", "").slice(0, 8)}` },
+  });
+  const demoSubs: string[] = [];
+  for (const [tid, pid] of [[T, pro], [books.id, bookPlan.id as string], [T, standard]] as const) {
+    const r = await must<{ subscription: { id: string } }>("POST", "/v1/me/subscriptions", { token: await demoTok(), body: { tenant_id: tid, plan_id: pid, payment_method_id: demoPm.id } });
+    demoSubs.push(r.subscription.id);
+  }
+  const demoCancelOn = addDays(start, 20); // 英会話はトライアル中に解約する（解約済みの表示の確認用）
+
   const signup = async () => {
     const f = pick(family), g = pick(given);
     const sub = `demo-c-${++seq}`;
@@ -201,6 +232,7 @@ async function main() {
   // 毎日の処理：更新日を迎える契約・回収の時刻を迎えた請求・申込・予約のある日だけを順に訪ねる
   let day = start;
   let visited = 0;
+  let demoCanceled = false;
   while (day < end) {
     // 1) 00:30 更新の前に、今日更新する契約のいくつかの支払いを失敗させる
     await setTo(day, "00:30");
@@ -217,14 +249,18 @@ async function main() {
       }
     }
     await runJob("orchestration-renewal-dispatch", day);
-    await settle(T, day);
+    await settle([T, books.id], day);
     // 2) 10:00 再請求
     await setTo(day, "10:00");
     await runJob("billing-collection-due");
-    await settle(T, day);
+    await settle([T, books.id], day);
     // 3) 11:00 契約者の操作（申込・トライアル中の解約・更新した契約の解約やプラン変更の予約）
     await setTo(day, "11:00");
     for (let i = 0; i < (signups.get(day) ?? 0); i++) await signup();
+    if (day === demoCancelOn || (day > demoCancelOn && !demoCanceled)) {
+      await call("PUT", `/v1/me/subscriptions/${demoSubs[2]}/scheduled-cancellation`, { token: await demoTok(), body: {} });
+      demoCanceled = true;
+    }
     for (const s of subs.values()) {
       if (s.cancelOn === day) {
         await call("PUT", `/v1/me/subscriptions/${s.id}/scheduled-cancellation`, { token: await token("consumer", s.sub, s.email, s.name), body: {} });
@@ -251,14 +287,15 @@ async function main() {
     // 次に訪ねる日
     const next = await one(
       `SELECT least(
-         (SELECT min(next_renewal_date) FROM subscription.subscriptions WHERE tenant_id = $1 AND status IN ('trialing','active') AND next_renewal_date > $2),
-         (SELECT min((next_collection_at AT TIME ZONE 'Asia/Tokyo')::date) FROM billing.invoices WHERE tenant_id = $1 AND status = 'open' AND collection_mode = 'scheduled' AND (next_collection_at AT TIME ZONE 'Asia/Tokyo')::date > $2)
+         (SELECT min(next_renewal_date) FROM subscription.subscriptions WHERE tenant_id = ANY($1::uuid[]) AND status IN ('trialing','active') AND next_renewal_date > $2),
+         (SELECT min((next_collection_at AT TIME ZONE 'Asia/Tokyo')::date) FROM billing.invoices WHERE tenant_id = ANY($1::uuid[]) AND status = 'open' AND collection_mode = 'scheduled' AND (next_collection_at AT TIME ZONE 'Asia/Tokyo')::date > $2)
        ) AS d`,
-      [T, day],
+      [[T, books.id], day],
     );
     const candidates: string[] = [next?.d ?? end];
     for (const d of signups.keys()) if (d > day) candidates.push(d);
     for (const s of subs.values()) if (s.cancelOn && s.cancelOn > day) candidates.push(s.cancelOn);
+    if (!demoCanceled && demoCancelOn > day) candidates.push(demoCancelOn);
     day = candidates.sort()[0]!;
   }
   await setTo(end, "12:00");
@@ -302,6 +339,15 @@ async function main() {
       "| ロール | メールアドレス | パスワード |",
       "|---|---|---|",
       ...lines,
+      "",
+      "## マイページ（契約者）",
+      "",
+      `- マイページ：${CONSOLE}/mypage/login`,
+      "- 「ミライ動画配信」のプロ・「ブックス定期便」の 2 冊コースを利用中、オンライン英会話はトライアル中に解約済み",
+      "",
+      "| メールアドレス | パスワード |",
+      "|---|---|",
+      `| \`${demoConsumer.email}\` | \`${demoConsumer.password}\` |`,
       "",
       "`task reset` で消える。作り直すときは `task reset` → `task up` → `task dev:container` → `task demo:seed`。",
       "",

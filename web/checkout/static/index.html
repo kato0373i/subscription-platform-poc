@@ -36,6 +36,13 @@
       </label>
     </section>
 
+    <!-- トークンがないとき（ログインしていない）はマイページのログインへ案内する（consumer-mypage FR-011） -->
+    <section id="login" hidden>
+      <p>お申し込みにはマイページのアカウントが必要です。</p>
+      <a id="login-link" class="button" href="/mypage/login">ログインして申し込む</a>
+      <a id="signup-link" class="button secondary" href="/mypage/signup">アカウントを作って申し込む</a>
+    </section>
+
     <button id="submit" type="button" disabled>申し込む</button>
     <p id="result" role="status" data-status="idle"></p>
   </main>

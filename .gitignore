@@ -21,3 +21,5 @@ node_modules/
 # 事業者コンソール（SPA）
 web/console/dist
 web/console/public/config.json
+web/mypage/dist
+web/mypage/public/config.json

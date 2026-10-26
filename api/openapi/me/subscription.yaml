@@ -32,6 +32,33 @@ paths:
       responses:
         "200": {description: 契約, content: {application/json: {schema: {$ref: '#/components/schemas/MeSubscription'}}}}
         "404": {$ref: '../common.yaml#/components/responses/Problem'}
+  /v1/me/subscriptions/{subscription_id}/plan-change-options:
+    get:
+      operationId: meListPlanChangeOptions
+      x-sp-isolation: tested
+      parameters:
+        - {$ref: '#/components/parameters/SubscriptionIDPath'}
+      responses:
+        "200":
+          description: 変更先にできるプラン（同じ商品の公開中のプランのうち現在のプラン以外。予約できない状態なら空。consumer-mypage §5.1）
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      required: [plan_id, name, billing_interval, amount, effective_date]
+                      properties:
+                        plan_id: {type: string, format: uuid}
+                        name: {type: string}
+                        billing_interval: {type: string, enum: [month, year]}
+                        amount: {type: integer, format: int64, description: 税込の円（現在の価格）}
+                        effective_date: {type: string, format: date, description: いま予約したときの適用日}
+        "404": {$ref: '../common.yaml#/components/responses/Problem'}
   /v1/me/subscriptions/{subscription_id}/scheduled-plan-change:
     put:
       operationId: meSchedulePlanChange
@@ -112,7 +139,7 @@ components:
     MeSubscription:
       type: object
       required: [id, tenant_id, product_id, plan_id, price_version_id, interval, quantity, status, entitled, current_period, next_renewal_date, trial,
-        scheduled_plan_change, scheduled_cancellation, renewal_in_progress, cancel_reason, canceled_at, created_at, payment_method_id, applied_discount]
+        scheduled_plan_change, scheduled_cancellation, renewal_in_progress, cancel_reason, canceled_at, created_at, payment_method_id, applied_discount, display]
       properties:
         id: {type: string, format: uuid}
         tenant_id: {type: string, format: uuid}
@@ -139,3 +166,14 @@ components:
           required: [remaining_cycles]
           properties:
             remaining_cycles: {type: integer}
+        display:
+          type: object
+          nullable: true
+          description: 表示用の値（consumer-mypage ADR-M01）。取得できなければ null
+          required: [tenant_name, product_name, plan_name, unit_amount, amount]
+          properties:
+            tenant_name: {type: string}
+            product_name: {type: string}
+            plan_name: {type: string}
+            unit_amount: {type: integer, format: int64, description: 契約の価格バージョンの金額（税込。価格の改定の後も契約時の価格）}
+            amount: {type: integer, format: int64, description: unit_amount × 数量}

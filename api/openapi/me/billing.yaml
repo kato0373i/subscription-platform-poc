@@ -27,9 +27,10 @@ components:
   schemas:
     MeInvoice:
       type: object
-      required: [id, status, kind, period, total, tax, lines, issued_at, paid_at, next_collection_at]
+      required: [id, status, kind, period, total, tax, lines, issued_at, paid_at, next_collection_at, attempt_count]
       properties:
         id: {type: string, format: uuid}
+        attempt_count: {type: integer, description: 決済の試行の回数（マイページが即時の再決済の結果を知るために使う。consumer-mypage §7）}
         status: {type: string, enum: [open, processing, paid, uncollectible, void], description: payment_unknown は processing として返す}
         kind: {type: string, enum: [initial, renewal]}
         period: {$ref: '#/components/schemas/Period'}

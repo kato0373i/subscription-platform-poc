@@ -207,3 +207,52 @@ func (s *Service) releaseSlot(ctx context.Context, tx db.Tx, repo *postgres.Repo
 	}
 	return s.d.Outbox.Append(ctx, tx, env)
 }
+
+// DescribePlan は契約者に見せるプランの説明（consumer-mypage ADR-M01）。事業者名は tenant の contracts から取る。
+func (s *Service) DescribePlan(ctx context.Context, t sk.TenantID, id contracts.PlanID) (contracts.PlanDescription, error) {
+	var out contracts.PlanDescription
+	err := s.d.DB.ReadTx(db.WithTenantScope(ctx, t), func(ctx context.Context, tx db.Tx) error {
+		repo := postgres.New(tx)
+		p, err := repo.GetPlan(ctx, id, false)
+		if err != nil {
+			return mapNotFound(err, contracts.ErrPlanNotFound)
+		}
+		st := p.State()
+		prod, err := repo.GetProduct(ctx, st.ProductID)
+		if err != nil {
+			return mapNotFound(err, contracts.ErrPlanNotFound)
+		}
+		out = contracts.PlanDescription{PlanID: st.ID, PlanName: st.Name, ProductID: st.ProductID, ProductName: prod.State().Name, Interval: st.Interval, Status: st.Status}
+		return nil
+	})
+	if err != nil {
+		return out, err
+	}
+	info, err := s.d.Tenants.GetTenant(db.ClearScope(ctx), t)
+	if err != nil {
+		return out, err
+	}
+	out.TenantName = info.Name
+	return out, nil
+}
+
+// maxPurchasablePlans は 1 つの商品の公開中のプランとして読む上限（変更先の候補。通常は数件）。
+const maxPurchasablePlans = 100
+
+// ListPurchasablePlans は商品の公開中のプラン（作成順）。
+func (s *Service) ListPurchasablePlans(ctx context.Context, t sk.TenantID, productID contracts.ProductID) ([]contracts.PurchasablePlan, error) {
+	var out []contracts.PurchasablePlan
+	err := s.d.DB.ReadTx(db.WithTenantScope(ctx, t), func(ctx context.Context, tx db.Tx) error {
+		pid := productID.UUID()
+		status := string(contracts.PlanPublished)
+		plans, err := postgres.New(tx).ListPlans(ctx, postgres.PlanFilter{ProductID: &pid, Status: &status}, nil, maxPurchasablePlans)
+		if err != nil {
+			return err
+		}
+		for _, p := range plans {
+			out = append(out, contracts.PurchasablePlan{PlanSnapshot: p.Snapshot(), Name: p.State().Name})
+		}
+		return nil
+	})
+	return out, err
+}

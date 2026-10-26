@@ -221,6 +221,10 @@ type Service interface {
     GetPurchasablePlan(ctx context.Context, tenantID TenantID, planID PlanID) (PlanSnapshot, error)
     // プラン変更先の検証・ID の検証用。状態に関係なく返す
     GetPlanSnapshot(ctx context.Context, tenantID TenantID, planID PlanID) (PlanDetail, error)
+    // 契約者に見せるプランの説明（プラン名・商品名・事業者名）。状態に関係なく返す（consumer-mypage ADR-M01）
+    DescribePlan(ctx context.Context, tenantID TenantID, planID PlanID) (PlanDescription, error)
+    // 商品の公開中のプラン（作成順。マイページのプラン変更の候補）
+    ListPurchasablePlans(ctx context.Context, tenantID TenantID, productID ProductID) ([]PurchasablePlan, error)
     // 価格の算出。PoC の usage は常に nil
     QuotePrice(ctx context.Context, tenantID TenantID, priceVersionID PriceVersionID, usage *UsageInput) (Quote, error)
     ReserveCoupon(ctx context.Context, tenantID TenantID, code string, planID PlanID,
@@ -625,3 +629,4 @@ RETURNING redeemed_count;
 | 2026-10-13 | P-TST-8 を反映。§11 の受け入れ条件に「確かめる場所」の列を追加し、e2e の条件ごとにシナリオの番号（E2E-003・017）か `e2e/tests/catalog/` の spec ファイル名の案を書いた。spec ファイルの一覧を追加 | TL-Catalog（Claude） |
 | 2026-10-13 | テスト戦略の改訂（Playwright の E2E を中心にし、モックは原則使わない。P-TST-1〜10、P-X-8・9）について PdM の最終確認を経て、Fixed とする | PdM |
 | 2026-10-24 | 実装時の決定を反映（P-IMP-12・13）：税率の表現を `"0.100"` に、publish の `tenant_not_active` を 403 に、`CouponReservation` に DurationCycles を追加、`outbox_events` の RLS の記述を Platform に合わせた。実装の状況は `docs/poc/impl/catalog.md` | PdM |
+| 2026-10-26 | contracts に `DescribePlan`・`ListPurchasablePlans` を追加（consumer-mypage、P-IMP-24） | PdM |

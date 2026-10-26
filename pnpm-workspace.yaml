@@ -2,3 +2,4 @@ packages:
   - e2e
   - web/packages/*
   - web/console
+  - web/mypage

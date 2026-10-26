@@ -35,10 +35,24 @@ GRANT CREATE, CONNECT ON DATABASE sp TO sp_admin;
 SQL
 
 # スタッフの Cognito のプール（事業者コンソール。business-console §5.2・§5.3）。Terraform の出力から読む
-STAFF_POOL_ID="" STAFF_CLIENT_ID=""
+# 契約者のプール（マイページ。consumer-mypage §5.4）も同じく読む
+STAFF_POOL_ID="" STAFF_CLIENT_ID="" CONSUMER_POOL_ID="" CONSUMER_CLIENT_ID=""
 if cog="$(./scripts/tf.sh output -json cognito 2>/dev/null)" && [[ -n "$cog" ]]; then
-  STAFF_POOL_ID="$(printf '%s' "$cog" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("staff",{}).get("id",""))' 2>/dev/null || true)"
-  STAFF_CLIENT_ID="$(printf '%s' "$cog" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("staff",{}).get("client_id",""))' 2>/dev/null || true)"
+  pool() { printf '%s' "$cog" | python3 -c "import sys,json;print(json.load(sys.stdin).get('$1',{}).get('$2',''))" 2>/dev/null || true; }
+  STAFF_POOL_ID="$(pool staff id)"
+  STAFF_CLIENT_ID="$(pool staff client_id)"
+  CONSUMER_POOL_ID="$(pool consumer id)"
+  CONSUMER_CLIENT_ID="$(pool consumer client_id)"
+fi
+
+# MiniStack は、パスワードの方針で指定しなかった項目を「必須」として扱う（本物の Cognito は「不要」）。Terraform の provider は false の項目を
+# 送らないので、契約者のプールだけ方針を明示して上書きする（consumer_auth の定義と同じ値。ローカル専用の回避策）
+if [[ -n "$CONSUMER_POOL_ID" ]]; then
+  curl -fsS -o /dev/null -X POST http://localhost:4566/ -H 'Content-Type: application/x-amz-json-1.1' \
+    -H 'X-Amz-Target: AWSCognitoIdentityProviderService.UpdateUserPool' \
+    -H 'Authorization: AWS4-HMAC-SHA256 Credential=test/20260101/ap-northeast-1/cognito-idp/aws4_request, SignedHeaders=host, Signature=local' \
+    -d "{\"UserPoolId\":\"$CONSUMER_POOL_ID\",\"Policies\":{\"PasswordPolicy\":{\"MinimumLength\":8,\"RequireLowercase\":true,\"RequireNumbers\":true,\"RequireUppercase\":false,\"RequireSymbols\":false}}}" \
+    || echo "local-env: 契約者のプールのパスワードの方針を上書きできませんでした" >&2
 fi
 
 if [[ -f .env.local ]] && grep -q '^CURSOR_KEY=' .env.local; then
@@ -70,12 +84,19 @@ DEV_JWT_KEY_PATH=deploy/local/dev-jwt.pem
 BILLING_COLLECTION_LEASE=1m
 WEBHOOK_RETRY_JITTER=0
 CONSOLE_URL=http://localhost:8090/console/
+MYPAGE_URL=http://localhost:8090/mypage/
+PAYMENT_METHOD_UPDATE_URL_TEMPLATE=http://localhost:8090/mypage/subscriptions/{subscription_id}/payment-method
 ENV
   if [[ -n "$STAFF_POOL_ID" ]]; then
     # MiniStack の ID トークンの iss は本物の AWS の URL なので、JWKS の取得先だけ MiniStack に向ける（下の行で環境ごとに書く）
     echo "COGNITO_STAFF_ISSUER=https://cognito-idp.ap-northeast-1.amazonaws.com/$STAFF_POOL_ID"
     echo "COGNITO_STAFF_CLIENT_ID=$STAFF_CLIENT_ID"
     echo "COGNITO_STAFF_USER_POOL_ID=$STAFF_POOL_ID"
+  fi
+  if [[ -n "$CONSUMER_POOL_ID" ]]; then
+    echo "COGNITO_CONSUMER_ISSUER=https://cognito-idp.ap-northeast-1.amazonaws.com/$CONSUMER_POOL_ID"
+    echo "COGNITO_CONSUMER_CLIENT_ID=$CONSUMER_CLIENT_ID"
+    echo "COGNITO_CONSUMER_USER_POOL_ID=$CONSUMER_POOL_ID"
   fi
 }
 
@@ -89,6 +110,7 @@ ENV
   echo "AWS_ENDPOINT_URL=http://localhost:4566"
   echo "QUEUE_URL_PREFIX=http://localhost:4566/000000000000/"
   [[ -n "$STAFF_POOL_ID" ]] && echo "COGNITO_STAFF_JWKS_URL=http://localhost:4566/$STAFF_POOL_ID/.well-known/jwks.json"
+  [[ -n "$CONSUMER_POOL_ID" ]] && echo "COGNITO_CONSUMER_JWKS_URL=http://localhost:4566/$CONSUMER_POOL_ID/.well-known/jwks.json"
   true
 } > .env.local
 
@@ -99,6 +121,7 @@ ENV
   echo "AWS_ENDPOINT_URL=http://ministack:4566"
   echo "QUEUE_URL_PREFIX=http://ministack:4566/000000000000/"
   [[ -n "$STAFF_POOL_ID" ]] && echo "COGNITO_STAFF_JWKS_URL=http://ministack:4566/$STAFF_POOL_ID/.well-known/jwks.json"
+  [[ -n "$CONSUMER_POOL_ID" ]] && echo "COGNITO_CONSUMER_JWKS_URL=http://ministack:4566/$CONSUMER_POOL_ID/.well-known/jwks.json"
   true
 } > .env.container
 
@@ -108,12 +131,19 @@ cat > web/console/public/config.json <<JSON
 {"cognito":{"region":"ap-northeast-1","userPoolId":"$STAFF_POOL_ID","clientId":"$STAFF_CLIENT_ID","endpoint":"http://localhost:4566"}}
 JSON
 
+# マイページ（SPA）のランタイムの設定（consumer-mypage §7）
+mkdir -p web/mypage/public
+cat > web/mypage/public/config.json <<JSON
+{"cognito":{"region":"ap-northeast-1","userPoolId":"$CONSUMER_POOL_ID","clientId":"$CONSUMER_CLIENT_ID","endpoint":"http://localhost:4566"}}
+JSON
+
 {
   echo "# task up が書き出す（Playwright が読む）"
   echo "API_BASE_URL=http://localhost:8080"
   echo "SINK_CONTROL_URL=http://localhost:18080"
   echo "CONSOLE_BASE_URL=http://localhost:8090"
   echo "COGNITO_STAFF_USER_POOL_ID=$STAFF_POOL_ID"
+  echo "COGNITO_CONSUMER_USER_POOL_ID=$CONSUMER_POOL_ID"
   echo "AWS_ENDPOINT_URL=http://localhost:4566"
   echo "SINK_TARGET_BASE=${SINK_TARGET_BASE:-http://localhost:18080}"
   echo "E2E_READER_URL=postgres://sp_e2e_reader:sp_e2e_reader_local@localhost:$HOST_PORT/sp?sslmode=disable"

@@ -93,10 +93,12 @@ type LineKind string
 
 // MeInvoice defines model for MeInvoice.
 type MeInvoice struct {
-	Id       openapi_types.UUID `json:"id"`
-	IssuedAt time.Time          `json:"issued_at"`
-	Kind     MeInvoiceKind      `json:"kind"`
-	Lines    []Line             `json:"lines"`
+	// AttemptCount 決済の試行の回数（マイページが即時の再決済の結果を知るために使う。consumer-mypage §7）
+	AttemptCount int                `json:"attempt_count"`
+	Id           openapi_types.UUID `json:"id"`
+	IssuedAt     time.Time          `json:"issued_at"`
+	Kind         MeInvoiceKind      `json:"kind"`
+	Lines        []Line             `json:"lines"`
 
 	// NextCollectionAt open かつダニング中だけ
 	NextCollectionAt *time.Time `json:"next_collection_at"`

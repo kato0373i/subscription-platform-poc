@@ -132,7 +132,7 @@ func invoiceJSON(s domain.State, a audience) map[string]any {
 	m := map[string]any{
 		"id": s.ID, "status": s.Status, "kind": s.Kind, "period": map[string]any{"start": s.Period.Start, "end": s.Period.End},
 		"total": s.Total.Int64(), "tax": map[string]any{"rate": rate, "amount": tax}, "lines": lines, "issued_at": s.IssuedAt, "paid_at": s.PaidAt,
-		"next_collection_at": next,
+		"next_collection_at": next, "attempt_count": s.AttemptCount,
 	}
 	if a == forMe {
 		if s.Status == c.StatusPaymentUnknown {

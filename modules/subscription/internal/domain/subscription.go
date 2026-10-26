@@ -421,6 +421,10 @@ func (x *Subscription) cancellationDate() sk.Date {
 }
 
 // planChangeDate はプラン変更の適用日。
+// PlanChangeDate はいまプラン変更を予約したときの適用日（マイページの変更先の候補。consumer-mypage §5.1）。
+// トライアル中・有効で、次の更新日があるときだけ呼ぶ。
+func (x *Subscription) PlanChangeDate(today sk.Date) sk.Date { return x.planChangeDate(today) }
+
 func (x *Subscription) planChangeDate(today sk.Date) sk.Date {
 	if r := x.s.PendingRenewal; r != nil {
 		return r.Period.NextStart()

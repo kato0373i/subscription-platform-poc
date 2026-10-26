@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/subscriptions/{subscription_id}/plan-change-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["meListPlanChangeOptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/subscriptions/{subscription_id}/scheduled-plan-change": {
         parameters: {
             query?: never;
@@ -127,6 +143,22 @@ export interface components {
             applied_discount: {
                 remaining_cycles: number;
             } | null;
+            /** @description 表示用の値（consumer-mypage ADR-M01）。取得できなければ null */
+            display: {
+                tenant_name: string;
+                product_name: string;
+                plan_name: string;
+                /**
+                 * Format: int64
+                 * @description 契約の価格バージョンの金額（税込。価格の改定の後も契約時の価格）
+                 */
+                unit_amount: number;
+                /**
+                 * Format: int64
+                 * @description unit_amount × 数量
+                 */
+                amount: number;
+            } | null;
         };
         Problem: {
             type: string;
@@ -215,6 +247,47 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeSubscription"];
+                };
+            };
+            404: components["responses"]["Problem"];
+        };
+    };
+    meListPlanChangeOptions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                subscription_id: components["parameters"]["SubscriptionIDPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 変更先にできるプラン（同じ商品の公開中のプランのうち現在のプラン以外。予約できない状態なら空。consumer-mypage §5.1） */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            /** Format: uuid */
+                            plan_id: string;
+                            name: string;
+                            /** @enum {string} */
+                            billing_interval: "month" | "year";
+                            /**
+                             * Format: int64
+                             * @description 税込の円（現在の価格）
+                             */
+                            amount: number;
+                            /**
+                             * Format: date
+                             * @description いま予約したときの適用日
+                             */
+                            effective_date: string;
+                        }[];
+                    };
                 };
             };
             404: components["responses"]["Problem"];

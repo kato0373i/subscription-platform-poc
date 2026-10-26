@@ -276,40 +276,101 @@ type meHandlers struct{ *handlers }
 
 var _ me.StrictServerInterface = meHandlers{}
 
-func meResource[T any](v c.SubscriptionView, err error) (T, error) {
+// meJSON は契約者に返す契約（表示用の値を付ける。取れなければ display は null）。
+func (h meHandlers) meJSON(ctx context.Context, v c.SubscriptionView) map[string]any {
+	r := toResource(v, forMe)
+	out, _ := asMap(r)
+	var d any
+	if x, ok := h.svc.Displays(ctx, []c.SubscriptionView{v})[v.ID]; ok {
+		d = x
+	}
+	out["display"] = d
+	return out
+}
+
+func meResource[T any](h meHandlers, ctx context.Context, v c.SubscriptionView, err error) (T, error) {
 	var zero T
 	if err != nil {
 		return zero, problem(err)
 	}
-	return convert[T](toResource(v, forMe))
+	return convert[T](h.meJSON(ctx, v))
 }
 
-func (h meHandlers) MeListSubscriptions(ctx context.Context, req me.MeListSubscriptionsRequestObject) (me.MeListSubscriptionsResponseObject, error) {
-	res, err := h.list(ctx, postgres.Filter{Statuses: statuses(req.Params.Status)}, req.Params.StartingAfter, req.Params.Limit, forMe)
+func asMap(v any) (map[string]any, error) {
+	b, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
 	}
-	return convert[me.MeListSubscriptions200JSONResponse](res)
+	var m map[string]any
+	return m, json.Unmarshal(b, &m)
+}
+
+func (h meHandlers) MeListSubscriptions(ctx context.Context, req me.MeListSubscriptionsRequestObject) (me.MeListSubscriptionsResponseObject, error) {
+	cur, err := h.cursor(req.Params.StartingAfter)
+	if err != nil {
+		return nil, err
+	}
+	items, more, err := h.svc.List(ctx, postgres.Filter{Statuses: statuses(req.Params.Status)}, cur, pageLimit(req.Params.Limit))
+	if err != nil {
+		return nil, problem(err)
+	}
+	displays := h.svc.Displays(ctx, items)
+	data := make([]map[string]any, len(items))
+	for i, v := range items {
+		m, err := asMap(toResource(v, forMe))
+		if err != nil {
+			return nil, err
+		}
+		var d any
+		if x, ok := displays[v.ID]; ok {
+			d = x
+		}
+		m["display"] = d
+		data[i] = m
+	}
+	out := map[string]any{"data": data, "has_more": more, "next_cursor": nil}
+	if more {
+		last := items[len(items)-1]
+		out["next_cursor"] = h.codec.Encode(postgres.Cursor{CreatedAt: last.CreatedAt, ID: last.ID.UUID()})
+	}
+	return convert[me.MeListSubscriptions200JSONResponse](out)
 }
 
 func (h meHandlers) MeGetSubscription(ctx context.Context, req me.MeGetSubscriptionRequestObject) (me.MeGetSubscriptionResponseObject, error) {
-	return meResource[me.MeGetSubscription200JSONResponse](h.svc.Find(ctx, subID(req.SubscriptionId)))
+	v, err := h.svc.Find(ctx, subID(req.SubscriptionId))
+	return meResource[me.MeGetSubscription200JSONResponse](h, ctx, v, err)
+}
+
+func (h meHandlers) MeListPlanChangeOptions(ctx context.Context, req me.MeListPlanChangeOptionsRequestObject) (me.MeListPlanChangeOptionsResponseObject, error) {
+	opts, err := h.svc.PlanChangeOptions(ctx, subID(req.SubscriptionId))
+	if err != nil {
+		return nil, problem(err)
+	}
+	data := make([]map[string]any, len(opts))
+	for i, o := range opts {
+		data[i] = map[string]any{"plan_id": o.PlanID, "name": o.Name, "billing_interval": o.Interval, "amount": o.Amount.Int64(), "effective_date": o.EffectiveDate}
+	}
+	return convert[me.MeListPlanChangeOptions200JSONResponse](map[string]any{"data": data})
 }
 
 func (h meHandlers) MeSchedulePlanChange(ctx context.Context, req me.MeSchedulePlanChangeRequestObject) (me.MeSchedulePlanChangeResponseObject, error) {
-	return meResource[me.MeSchedulePlanChange200JSONResponse](h.svc.SchedulePlanChange(ctx, subID(req.SubscriptionId), sk.IDFromUUID[sk.PlanTag](req.Body.PlanId)))
+	v, err := h.svc.SchedulePlanChange(ctx, subID(req.SubscriptionId), sk.IDFromUUID[sk.PlanTag](req.Body.PlanId))
+	return meResource[me.MeSchedulePlanChange200JSONResponse](h, ctx, v, err)
 }
 
 func (h meHandlers) MeRevokePlanChange(ctx context.Context, req me.MeRevokePlanChangeRequestObject) (me.MeRevokePlanChangeResponseObject, error) {
-	return meResource[me.MeRevokePlanChange200JSONResponse](h.svc.RevokePlanChange(ctx, subID(req.SubscriptionId)))
+	v, err := h.svc.RevokePlanChange(ctx, subID(req.SubscriptionId))
+	return meResource[me.MeRevokePlanChange200JSONResponse](h, ctx, v, err)
 }
 
 func (h meHandlers) MeScheduleCancellation(ctx context.Context, req me.MeScheduleCancellationRequestObject) (me.MeScheduleCancellationResponseObject, error) {
-	return meResource[me.MeScheduleCancellation200JSONResponse](h.svc.ScheduleCancellation(ctx, subID(req.SubscriptionId)))
+	v, err := h.svc.ScheduleCancellation(ctx, subID(req.SubscriptionId))
+	return meResource[me.MeScheduleCancellation200JSONResponse](h, ctx, v, err)
 }
 
 func (h meHandlers) MeRevokeCancellation(ctx context.Context, req me.MeRevokeCancellationRequestObject) (me.MeRevokeCancellationResponseObject, error) {
-	return meResource[me.MeRevokeCancellation200JSONResponse](h.svc.RevokeCancellation(ctx, subID(req.SubscriptionId)))
+	v, err := h.svc.RevokeCancellation(ctx, subID(req.SubscriptionId))
+	return meResource[me.MeRevokeCancellation200JSONResponse](h, ctx, v, err)
 }
 
 // ---- console ----

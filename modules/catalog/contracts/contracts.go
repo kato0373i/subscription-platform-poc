@@ -54,6 +54,23 @@ type PlanDetail struct {
 	Published bool
 }
 
+// PlanDescription は契約者に見せるプランの説明（状態に関係なく返す。consumer-mypage ADR-M01）。
+type PlanDescription struct {
+	PlanID      PlanID
+	PlanName    string
+	ProductID   ProductID
+	ProductName string
+	TenantName  string
+	Interval    sk.BillingInterval
+	Status      PlanStatus
+}
+
+// PurchasablePlan は申込・プラン変更の候補にできる公開中のプラン。
+type PurchasablePlan struct {
+	PlanSnapshot
+	Name string
+}
+
 // UsageInput は従量課金などの使用量（PoC では常に nil。将来の項目は追加のみ。§10）。
 type UsageInput struct{}
 
@@ -77,6 +94,10 @@ type Service interface {
 	GetPurchasablePlan(ctx context.Context, tenantID sk.TenantID, planID PlanID) (PlanSnapshot, error)
 	// GetPlanSnapshot はプラン変更先の検証・ID の検証用。状態に関係なく返す。
 	GetPlanSnapshot(ctx context.Context, tenantID sk.TenantID, planID PlanID) (PlanDetail, error)
+	// DescribePlan は契約者に見せるプランの説明（事業者名・商品名・プラン名）。状態に関係なく返す。なければ ErrPlanNotFound。
+	DescribePlan(ctx context.Context, tenantID sk.TenantID, planID PlanID) (PlanDescription, error)
+	// ListPurchasablePlans は商品の公開中のプラン（作成順）。
+	ListPurchasablePlans(ctx context.Context, tenantID sk.TenantID, productID ProductID) ([]PurchasablePlan, error)
 	// QuotePrice は価格の算出。PoC の usage は常に nil。
 	QuotePrice(ctx context.Context, tenantID sk.TenantID, priceVersionID PriceVersionID, usage *UsageInput) (Quote, error)
 	ReserveCoupon(ctx context.Context, tenantID sk.TenantID, code string, planID PlanID, customerAccountID sk.CustomerAccountID, subscriptionID sk.SubscriptionID) (CouponReservation, error)

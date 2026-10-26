@@ -75,10 +75,16 @@ resource "aws_ses_email_identity" "noreply" {
   email = "noreply@sp.local"
 }
 
-# AUTH_MODE=cognito 用の契約者・運営者のプール（PoC の標準は AUTH_MODE=dev）
+# AUTH_MODE=cognito 用の運営者のプール（PoC の標準は AUTH_MODE=dev）
 resource "aws_cognito_user_pool" "pool" {
-  for_each = toset(["consumer", "operator"])
+  for_each = toset(["operator"])
   name     = "sp-local-${each.key}"
+}
+
+# 契約者のプール（マイページ。本番と同じ定義のモジュール。consumer-mypage §5.4）
+module "consumer_auth" {
+  source = "../../modules/consumer_auth"
+  name   = "sp-local-consumer"
 }
 
 # スタッフのプール（事業者コンソール。本番と同じ定義のモジュール。business-console §5.3）
@@ -110,5 +116,6 @@ output "cognito" {
   value = merge(
     { for k, p in aws_cognito_user_pool.pool : k => { id = p.id, client_id = aws_cognito_user_pool_client.client[k].id } },
     { staff = { id = module.staff_auth.user_pool_id, client_id = module.staff_auth.client_id } },
+    { consumer = { id = module.consumer_auth.user_pool_id, client_id = module.consumer_auth.client_id } },
   )
 }

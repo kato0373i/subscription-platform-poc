@@ -785,3 +785,4 @@ stateDiagram-v2
 | 2026-10-24 | NFR-017（調査用のログ）を追加 | Claude（PdM） |
 | 2026-10-26 | NFR-009 の管理画面の多要素認証を将来対応に変更（事業者コンソールの要件定義でのオーナーの決定。`docs/requirements/business-console.md`） | Claude（PdM） |
 | 2026-10-26 | FR-010（基本指標の表示）の詳細を `docs/requirements/console-dashboard.md` で定義（KGI・KPI・目標・推移。集計はイベント駆動でほぼリアルタイム） | PdM（Claude） |
+| 2026-10-26 | FR-018（契約者のマイページ）の詳細を `docs/requirements/consumer-mypage.md` で定義（ログイン・手続き・退会・申込ページからのログイン） | PdM（Claude） |

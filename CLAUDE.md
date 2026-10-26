@@ -14,7 +14,7 @@
 - `task up`（MiniStack・RDS・キュー・マイグレーション）→ `task dev`（4 プロセスを go run）または `task dev:container` → `task verify:local`。
 - テスト：`task test:unit`・`task test:integration`・`task e2e`（4 プロセスが起動している前提）・`task lint`。
 - まっさらにする：`task reset`。
-- デモデータ：まっさらな環境で `task demo:seed`（約 12 か月分の契約・請求とコンソールのログイン用アカウント。ログイン情報は `.local/demo-accounts.md`。dev clock を 12 か月先まで進める）。
+- デモデータ：まっさらな環境で `task demo:seed`（約 12 か月分の契約・請求と、事業者コンソール・マイページのログイン用アカウント。ログイン情報は `.local/demo-accounts.md`。dev clock を 12 か月先まで進める）。
 - コード生成：`task generate`（errcodes・sqlc・oapi-codegen・TS の型）。`api/openapi/**`・`api/errors.yaml`・`modules/*/db/queries`・マイグレーションを変えたら流し、生成物もコミットする。
 
 ## 不具合の調査・テストの失敗
