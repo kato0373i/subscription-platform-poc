@@ -1,5 +1,8 @@
 # ローカル環境
 /.local/
+# ローカル・CI 専用の鍵（scripts/local-keys.sh が task up で作る）
+/deploy/local/dev-jwt.pem
+/deploy/local/tls/
 /.env.local
 /.env.container
 /e2e/.env.e2e

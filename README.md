@@ -1,8 +1,40 @@
 # subscription-platform
 
-マルチテナント型（複数の事業者）× B2C のサブスクリプション基盤の PoC。Go のモジュラーモノリス、本番は ECS Fargate、ローカルは MiniStack。
+マルチテナント型（複数の事業者）× B2C のサブスクリプション基盤の PoC。事業者が商品・プランを登録し、契約者が申し込むと、更新ごとの請求・決済・支払い失敗時の再試行・解約・事業者への Webhook 通知までを行う。
 
-始め方・コマンド・調査の手順は [CLAUDE.md](CLAUDE.md) を見る（`task up` → `task dev:container` → `task e2e`）。
+## このリポジトリについて
+
+- 個人で作った PoC（実際のサービスではない）。決済代行は fincode を想定し、PoC ではスタブ（`StubAdapter`）で動かす。
+- **AI（Claude Code）と進めた**。オーナー（筆者）が課題・方針・判断を決め、AI が PdM・アーキテクト・各領域のテックリードの役割で、要件定義 → 設計 → 実装 → テストまでを進めた。決定の経緯は `docs/poc/02-pdm-decisions.md` に残している。
+- 規模：Go 約 3.2 万行（テスト約 1 万行）、TypeScript の画面 約 9 千行、業務のモジュール 10、E2E 約 210 件（GitHub Actions で毎回実行）。
+
+### 見どころ
+
+| 観点 | 内容 | 詳しく |
+|---|---|---|
+| 設計 | モジュラーモノリス（業務ごとのモジュール、公開する口は `contracts` だけ）。モジュール間はイベント（Outbox → EventBridge → SQS）で結果整合性。申込・更新は調停役（プロセスマネージャー）が進める | `docs/design/subscription-platform.md`（ADR は §7） |
+| お金の正しさ | 冪等キーによる二重課金の防止、結果不明の決済の照合、日次の突き合わせ、運営者による手動の是正と監査ログ | `docs/poc/specs/payments.md`・`billing.md` |
+| マルチテナント | PostgreSQL の RLS（行レベルセキュリティ）で事業者のデータを分離。分離のテストを E2E で必須にしている | `docs/poc/specs/platform.md` |
+| テスト | モックを原則使わず、ローカルの AWS 互換環境（MiniStack）で 4 つのプロセスを動かし、Playwright で API・画面・DB の値まで確かめる。時刻を進めるテスト（更新・期限）も E2E で行う | `e2e/`、`docs/poc/02-pdm-decisions.md` の P-TST |
+| 調べやすさ | 相関 ID でプロセスをまたいでログを追える。テストが落ちたらログと時系列をレポートに添付 | `docs/runbooks/debugging.md` |
+| 画面 | 事業者コンソール（KGI/KPI のダッシュボード）・契約者のマイページ・運営者コンソール（React・Mantine・Cognito） | `web/` |
+
+### 技術
+
+Go（pgx・sqlc・oapi-codegen）、PostgreSQL、AWS（ECS Fargate・Aurora・EventBridge・SQS・Cognito・SES を想定）、Terraform、React 19・TypeScript・Mantine、Playwright、GitHub Actions。ローカルは MiniStack（AWS 互換）と Docker。
+
+### 動かし方
+
+必要なもの：Docker・Go・Node（と openssl）。
+
+```bash
+go tool task up             # ローカルの AWS 互換環境・DB・キューを作る
+go tool task dev:container  # 4 つのプロセスと画面を起動する（http://localhost:8090/console/）
+go tool task e2e            # E2E を流す
+go tool task demo:seed      # 約 12 か月分のデモデータ（ログイン情報は .local/demo-accounts.md）
+```
+
+コマンドの一覧と調査の手順は [CLAUDE.md](CLAUDE.md)。
 
 ## ディレクトリの案内
 

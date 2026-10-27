@@ -16,6 +16,7 @@ tasks:
     desc: MiniStack・webhook-sink・Fluent Bit を起動し、Terraform で RDS・キュー等を作り、マイグレーションまで流す
     cmds:
       - mkdir -p .local/logs .local/bin
+      - ./scripts/local-keys.sh
       - docker compose up -d --wait ministack webhook-sink
       - '{{if eq .DB_MODE "container"}}docker compose --profile db up -d --wait postgres{{else}}true{{end}}'
       - ./scripts/tf.sh init -input=false -upgrade=false
