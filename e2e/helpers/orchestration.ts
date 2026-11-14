@@ -131,9 +131,13 @@ export function addDays(date: string, days: number): string {
 
 /** 1 か月後の同じ日（D は 15 日に揃えるので月末の補正はない）。 */
 export function addMonths(date: string, months: number): string {
-  const d = new Date(`${date}T00:00:00Z`);
-  d.setUTCMonth(d.getUTCMonth() + months);
-  return d.toISOString().slice(0, 10);
+  // 月末に丸める（1/29 + 1 か月は平年なら 2/28。Date の setUTCMonth は 3/1 にあふれるので使わない。業務の更新日の規則と同じ）
+  const [y, m, day] = date.split("-").map(Number) as [number, number, number];
+  const total = y * 12 + (m - 1) + months;
+  const ny = Math.floor(total / 12);
+  const nm = (total % 12) + 1;
+  const last = new Date(Date.UTC(ny, nm, 0)).getUTCDate();
+  return `${ny}-${String(nm).padStart(2, "0")}-${String(Math.min(day, last)).padStart(2, "0")}`;
 }
 
 /** JST の日時の ISO 文字列。 */
