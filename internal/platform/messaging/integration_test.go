@@ -70,6 +70,9 @@ func runConsumer(t *testing.T, p messaging.Processor, cfg messaging.ConsumerConf
 	return stop
 }
 
+// heavyTimeout は大量のメッセージを通すテストの待ち時間の上限（CI の実行環境で MiniStack が遅くなることがあるため長めにする）。
+const heavyTimeout = 180 * time.Second
+
 func eventually(t *testing.T, timeout time.Duration, cond func() bool, msg string) {
 	t.Helper()
 	deadline := time.Now().Add(timeout)
@@ -126,13 +129,14 @@ func TestRelaySkipLockedDeliversAllOnce(t *testing.T) {
 		wg.Add(1)
 		go func() { defer wg.Done(); _ = r.Run(ctx) }()
 	}
-	eventually(t, 60*time.Second, func() bool {
+	// 大量のメッセージを MiniStack に通すので、CI の混んだ実行環境では遅くなることがある。条件がそろえば待たずに進む
+	eventually(t, heavyTimeout, func() bool {
 		return d.QueryInt(t, `SELECT (SELECT count(*) FROM billing.outbox_events WHERE published_at IS NULL) + (SELECT count(*) FROM payments.outbox_events WHERE published_at IS NULL) + (SELECT count(*) FROM subscription.outbox_events WHERE published_at IS NULL)`) == 0
 	}, "全件送信済み")
 	cancel()
 	wg.Wait()
 	seen := map[string]int{}
-	for _, b := range awstest.DrainAtLeast(t, url, 1002, 60*time.Second) {
+	for _, b := range awstest.DrainAtLeast(t, url, 1002, heavyTimeout) {
 		env, err := messaging.DecodeBody(b)
 		if err != nil {
 			t.Fatal(err)
@@ -300,7 +304,7 @@ func TestConcurrencyIsBounded(t *testing.T) {
 	})
 	sendMany(t, url, 100)
 	runConsumer(t, disp, consumerCfg(t, url, dlq))
-	eventually(t, 60*time.Second, func() bool { return done.Load() == 100 }, "100 件処理")
+	eventually(t, heavyTimeout, func() bool { return done.Load() == 100 }, "100 件処理")
 	if p := peak.Load(); p > 4 || p < 2 {
 		t.Fatalf("同時実行の最大 = %d（上限 4）", p)
 	}
