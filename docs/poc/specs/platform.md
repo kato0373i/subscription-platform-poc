@@ -937,7 +937,7 @@ e2e/
 | AC-PLT-016 | スコープを設定しない context | `InTx` | `ErrNoScope`、fn は呼ばれない | NFR-008 | integration |
 | AC-PLT-017 | `tenant_id` 列があり RLS がないテーブルを作る | `AssertAllTenantTablesHaveRLS` | テストが失敗する | NFR-008 | integration |
 | AC-PLT-018 | billing の `ModuleDB` | `subscription.subscriptions` を SELECT | 42501（permission denied） | NFR-008 | integration |
-| AC-PLT-019 | 3 スキーマに未送信 1,000 件（各 334 件）、MiniStack の EventBridge → SQS | Relay を 2 つ同時に動かす | EventBridge が全件をちょうど 1 回ずつ受け付け（PutEvents の成功を event_id で数えて欠け 0・重複 0）、全件 `published_at` あり。SQS に届いた分は受け付けたものだけで重複 0（MiniStack の配送の欠けは記録だけ。P-IMP-26） | FR-020, NFR-005 | integration |
+| AC-PLT-019 | 3 スキーマに未送信 1,000 件（各 334 件）、MiniStack の EventBridge → SQS | Relay を 2 つ同時に動かす | EventBridge が全件をちょうど 1 回ずつ受け付け（PutEvents の成功を event_id で数えて欠け 0・重複 0）、全件 `published_at` あり。SQS に届くのは受け付けたものだけ（MiniStack の配送の欠けと重複は記録だけ。P-IMP-26） | FR-020, NFR-005 | integration |
 | AC-PLT-020 | 未送信 10 件、EventBridge に届かない状態（到達できないエンドポイント。MiniStack は存在しないバスへの PutEvents も受け付けるため。P-IMP-4） | Relay の 1 周 → バスを作り直して次の周回 | 1 周目は 10 件とも `attempts=1`・`next_attempt_at` が未来で、業務の行はそのまま。作り直した後の周回で 10 件とも送信済み | NFR-005 | integration |
 | AC-PLT-021 | 同じ event_id のメッセージを MiniStack の SQS に 2 回送る | テスト用の購読者（行を 1 つ書く）を `inbox.Wrap` で動かす | 業務の書き込みは 1 回、2 回目は成功扱いで削除される | FR-020, NFR-006 | integration |
 | AC-PLT-022 | 常にエラーを返すテスト用の購読者（max_receive 5） | `sqsconsumer` で処理 | 削除されず、バックオフ付きで再配信され、5 回で DLQ に移る。その間 `processed_messages` は増えない | NFR-005 | integration |
@@ -1036,4 +1036,4 @@ e2e/
 | 2026-10-24 | subscription の実装時の決定を反映（P-IMP-14）：モジュールをまたぐ ID を sharedkernel に追加、`scheduler.Stats` を `map[string]any` に、一括シード（§7.3）を段階 1（payments・billing の前。支払方法と初回の請求は合成 ID）で実装 | PdM |
 | 2026-10-25 | payments の実装時の決定を反映（P-IMP-15）：`migrate.Source.Table`（devtools だけのマイグレーションのバージョン表）、設定 `PAYMENTS_METHODS`・`STUB_WEBHOOK_SECRET`・`FINCODE_*`、sharedkernel に `PaymentAttemptID`、一括シードの段階 2 の前半（支払方法の登録と初回の決済） | PdM |
 | 2026-10-25 | orchestration の実装（P-IMP-17）を反映：`db.ClearScope`、`inbox.Guard`（処理の後に記録）、`messaging.RetryAfter`（固定の時間の再配信）、`SQSCommandSender.SendFIFOBatch`、Problem の任意項目 `decline_category`、ローカルの `BILLING_COLLECTION_LEASE=1m`、dev clock の読み直しを裏のループにする（`Now()` が DB の接続を待ってデッドロックした不具合の修正） | PdM |
-| 2026-11-18 | AC-PLT-019 の確かめ方を変更（P-IMP-26）：Relay の排他は EventBridge が受け付けた件数（欠け 0・重複 0）で確かめ、SQS 側は重複 0 と受け付けたものだけが届くことを確かめる。MiniStack の配送の欠けは記録だけにする | TL-Platform（Claude） |
+| 2026-11-18 | AC-PLT-019 の確かめ方を変更（P-IMP-26）：Relay の排他は EventBridge が受け付けた件数（欠け 0・重複 0）で確かめ、SQS 側は受け付けたものだけが届くことを確かめる。MiniStack の配送の欠けと重複は記録だけにする | TL-Platform（Claude） |
