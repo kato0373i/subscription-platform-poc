@@ -121,7 +121,7 @@ func TestRelaySkipLockedDeliversAllOnce(t *testing.T) {
 	bus := uniq("bus")
 	url, _ := awstest.CreateQueue(t, uniq("relay"), awstest.QueueOptions{})
 	awstest.CreateBusWithRule(t, bus, "all", `{"source":[{"prefix":"sp."}]}`, url)
-	pub := messaging.NewEventBridgePublisher(awstest.EventBridge(t), bus)
+	pub := &recordingPublisher{inner: messaging.NewEventBridgePublisher(awstest.EventBridge(t), bus), ok: map[string]int{}}
 	ctx, cancel := context.WithCancel(context.Background())
 	var wg sync.WaitGroup
 	for range 2 {
@@ -135,13 +135,27 @@ func TestRelaySkipLockedDeliversAllOnce(t *testing.T) {
 	}, "全件送信済み")
 	cancel()
 	wg.Wait()
+
+	// ① SKIP LOCKED の本体：2 つの Relay で、EventBridge が受け付けた（PutEvents の entry が成功した）event がちょうど 1 回ずつ
+	published, pubDups := pub.snapshot()
+	if len(published) != 1002 || pubDups != 0 {
+		t.Fatalf("EventBridge が受け付けた件数 %d、重複 %d（2 つの Relay で同じ行を送った）", len(published), pubDups)
+	}
+
+	// ② SQS 側：受け付けたもの以外は届かず、重複もない。
+	// MiniStack 1.5.32 は負荷の高い CI で EventBridge → SQS の配送を取りこぼすことがある（PutEvents は成功、P-IMP-26）。
+	// 本番の EventBridge は配送を再試行する前提なので、欠けは記録だけにし、テストの失敗にはしない
 	seen := map[string]int{}
-	for _, b := range awstest.DrainAtLeast(t, url, 1002, heavyTimeout) {
+	for _, b := range awstest.DrainAtLeast(t, url, 1002, 60*time.Second) {
 		env, err := messaging.DecodeBody(b)
 		if err != nil {
 			t.Fatal(err)
 		}
-		seen[env.EventID.String()]++
+		id := env.EventID.String()
+		if published[id] == 0 {
+			t.Fatalf("受け付けていない event が届いた: %s", id)
+		}
+		seen[id]++
 	}
 	dups := 0
 	for _, n := range seen {
@@ -149,9 +163,48 @@ func TestRelaySkipLockedDeliversAllOnce(t *testing.T) {
 			dups++
 		}
 	}
-	if len(seen) != 1002 || dups != 0 {
-		t.Fatalf("届いた件数 %d、重複 %d", len(seen), dups)
+	if dups != 0 {
+		t.Fatalf("SQS に届いた件数 %d、重複 %d", len(seen), dups)
 	}
+	if missing := len(published) - len(seen); missing > 0 {
+		t.Logf("MiniStack の EventBridge → SQS で %d 件届かなかった（PutEvents は成功。P-IMP-26）", missing)
+	}
+}
+
+// recordingPublisher は本物の Publisher を包み、成功した event_id ごとの送信回数を数える（複数の Relay から同時に呼ばれる）。
+type recordingPublisher struct {
+	inner messaging.Publisher
+	mu    sync.Mutex
+	ok    map[string]int
+}
+
+func (p *recordingPublisher) Publish(ctx context.Context, evs []sk.EventEnvelope) ([]messaging.PublishResult, error) {
+	res, err := p.inner.Publish(ctx, evs)
+	if err != nil {
+		return res, err
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	for _, r := range res {
+		if r.Err == nil {
+			p.ok[r.EventID.String()]++
+		}
+	}
+	return res, nil
+}
+
+func (p *recordingPublisher) snapshot() (map[string]int, int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	cp := make(map[string]int, len(p.ok))
+	dups := 0
+	for id, n := range p.ok {
+		cp[id] = n
+		if n > 1 {
+			dups++
+		}
+	}
+	return cp, dups
 }
 
 // AC-PLT-020
